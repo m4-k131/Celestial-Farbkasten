@@ -1,12 +1,15 @@
+import os 
+
+import numpy as np 
+import cv2 
+
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.visualization import ImageNormalize, ZScaleInterval, AsinhStretch
 from skimage.transform import AffineTransform, warp
 import astroalign
 import astropy
-import numpy as np 
-import os 
-import cv2 
+
 
 STRETCH_FUNCTIONS = {
     'BaseStretch': astropy.visualization.stretch.BaseStretch,
@@ -66,6 +69,7 @@ def load_fits_data(fits_path, index=1):
         data = hdul[index].data
     return data 
 
+
 def get_normalized_images(data, plot_normalized=False):
     norm = ImageNormalize(data, interval=ZScaleInterval(), stretch=AsinhStretch())
     if plot_normalized:
@@ -77,10 +81,6 @@ def get_normalized_images(data, plot_normalized=False):
     return norm(data)
 
 
-import numpy as np
-
-import numpy as np
-
 def rescale_image_to_uint(source_data, percentile_black=1.0, percentile_white=99.0, background_color=0, replace_below_black=None, replace_above_white=None):
     """
     Rescales a float image to uint8, with options to replace out-of-band values.
@@ -89,56 +89,37 @@ def rescale_image_to_uint(source_data, percentile_black=1.0, percentile_white=99
     nan_mask = np.isnan(source_data)
     black_level = np.nanpercentile(source_data, percentile_black)
     white_level = np.nanpercentile(source_data, percentile_white)
-
     if white_level <= black_level:
         uint8_image = np.full(source_data.shape, background_color, dtype=np.uint8)
         return uint8_image
-
-    # 2. Perform scaling.
-    rescaled_float = 255 * (source_data - black_level) / (white_level - black_level)
     
-    # 3. Clip the scaled values. The array still contains NaNs at this point.
+    rescaled_float = 255 * (source_data - black_level) / (white_level - black_level)
     clipped_float = np.clip(rescaled_float, 0, 255)
-
-    # --- THE FIX: Explicitly handle NaNs before casting to integer ---
-    # Replace any NaN values in the float array with 0. This makes the cast safe.
     np.nan_to_num(clipped_float, copy=False, nan=0)
-    # --- END FIX ---
-
-    # 4. Now, this conversion is safe and will not produce a warning.
     uint8_image = clipped_float.astype(np.uint8)
 
-    # 5. Overwrite clipped values if replacement is requested.
     if replace_below_black is not None:
         below_mask = source_data < black_level
         uint8_image[below_mask] = replace_below_black
-
     if replace_above_white is not None:
         above_mask = source_data > white_level
         uint8_image[above_mask] = replace_above_white
 
-    # 6. Handle NaNs last to ensure the correct background_color is set.
     uint8_image[nan_mask] = background_color
-
     return uint8_image
 
-def get_transformation(source_data, reference_data):
-    transformation, (source_list, target_list) = astroalign.find_transform(source_data, reference_data)
-    # transformation.params will give you a 3x3 NumPy array.  matrix, scale, rotation, and translation.
-    return transformation.params
 
 def apply_transormation(source_data, transformation_params, output_shape):
     tform = AffineTransform(matrix=transformation_params)
     transformed_data = warp(source_data, inverse_map=tform.inverse, preserve_range=True, output_shape=output_shape, cval=0)
     return transformed_data
 
+
 def process_data(raw_data, percentile_black=0.1, percentile_white=0.9 , background_color = 0, replace_below_black=None, replace_above_white=None):
     normalized_data = get_normalized_images(raw_data)
     rescaled_image = rescale_image_to_uint(normalized_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
     return rescaled_image
 
-
-from astroalign import MaxIterError
 
 def find_transformations(dict_to_process):
     """
@@ -180,13 +161,12 @@ def find_transformations(dict_to_process):
                 print(f"    -> Found transformation with {len(source_list)} matching pairs.")
                 transformations[filepath][other_filepath] = transformation.params
 
-            except MaxIterError:
+            except astroalign.MaxIterError:
                 print("    -> ERROR: Could not find transformation. Max iterations reached.")
                 transformations[filepath][other_filepath] = None # Store None if no match is found
             except Exception as e:
                 print(f"    -> ERROR: An unexpected error occurred: {e}")
                 transformations[filepath][other_filepath] = None
-
     return transformations
 
 def find_best_reference_image(transformations):
@@ -202,49 +182,32 @@ def find_best_reference_image(transformations):
     """
     centrality_scores = {}
     filepaths = list(transformations.keys())
-
     for ref_path in filepaths:
         total_distance = 0
-        
         for other_path in filepaths:
             if ref_path == other_path:
                 continue
-
             params = transformations[other_path].get(ref_path)
-            
             tx, ty = None, None
-
-            # === MODIFICATION START ===
-            # Check if params is a dictionary (for identity transforms)
             if isinstance(params, dict) and 'translation' in params:
                 tx, ty = params['translation']
-            # Check if it's a NumPy array (for all other transforms)
             elif isinstance(params, np.ndarray) and params.shape == (3, 3):
                 tx = params[0, 2]  # Translation in x is the 3rd element of the 1st row
                 ty = params[1, 2]  # Translation in y is the 3rd element of the 2nd row
-            # === MODIFICATION END ===
-
             if tx is not None and ty is not None:
                 distance = np.sqrt(tx**2 + ty**2)
                 total_distance += distance
             else:
                 print(f"Warning: Could not extract translation from {other_path} to {ref_path}")
                 total_distance += np.inf
-
         centrality_scores[ref_path] = total_distance
-
     if not centrality_scores:
         return None
-
-    # For debugging, you can print the scores
     print("\nCentrality Scores (lower is better):")
     for path, score in centrality_scores.items():
-        # A bit of string manipulation to make the output readable
         filename = path.split('/')[-1]
         print(f"  - {filename:<45}: {score:.2f}")
-
     best_reference = min(centrality_scores, key=centrality_scores.get)
-    
     return best_reference
             
 
