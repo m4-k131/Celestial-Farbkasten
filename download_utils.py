@@ -33,7 +33,6 @@ def download_file_verbose(url, local_filename):
     try:
         with requests.get(url, stream=True, timeout=Constants.DEFAULT_TIMEOUT) as r:
             r.raise_for_status()
-            # Get total file size from headers. Can be None.
             total_size = r.headers.get('content-length')
             if total_size is not None:
                 total_size = int(total_size)
@@ -53,7 +52,6 @@ def download_file_verbose(url, local_filename):
                     progress_bar_len = 30
                     filled_len = int(progress_bar_len * downloaded_size / total_size) if total_size is not None else 0
                     download_bar = '█' * filled_len + '-' * (progress_bar_len - filled_len)
-                    # Using sys.stdout.write and '\r' to print on the same line
                     status = (
                         f"\r[{download_bar}] {percent_done:.1f}% | "
                         f"{format_size(downloaded_size)}/{format_size(total_size)} | "
@@ -75,12 +73,12 @@ def download_with_tqdm(url, local_filename):
             with open(local_filename, 'wb') as f, tqdm(
                 desc=local_filename,
                 total=total_size,
-                unit='iB', # Use 'iB' for bytes (e.g., KiB, MiB)
+                unit='iB',
                 unit_scale=True,
                 unit_divisor=1024,
             ) as download_bar:
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     size = f.write(chunk)
-                    download_bar.update(size) # Update progress bar by the size of the chunk written
+                    download_bar.update(size)
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
