@@ -1,5 +1,5 @@
 import os 
-
+import itertools
 import numpy as np 
 import cv2 
 
@@ -36,8 +36,8 @@ INTERVAL_FUNCTIONS = {
 DEFUALT_PROCESSING_PARAMS = [
 
     {
-    "percentile_black": [20, 40, 60, 80],
-    "percentile_white": [90, 95, 97, 98, 99, 100],
+    "percentile_black": [20, 40, 60, 80, 85, 90],
+    "percentile_white": [25, 45, 65, 90, 95, 97, 98, 99, 99.5, 100],
     "background_color": [0],
     "replace_below_black": [0],
     "replace_above_white": [0, 255],
@@ -65,9 +65,9 @@ PIPELINE_PARAMS = {
 
 def load_fits_data(fits_path, index=1):
     with fits.open(fits_path) as hdul:
-        # Assuming the image data is in the primary HDU
         data = hdul[index].data
-    return data 
+    native_data = data.astype(data.dtype.name)
+    return native_data
 
 
 def get_normalized_images(data, plot_normalized=False):
@@ -213,7 +213,6 @@ def find_best_reference_image(transformations):
 
 
 def process_dictionary(dict_to_process, outpath):
-    #todo: less lines for params after params are finished
 
     transformations = find_transformations(dict_to_process)
     best_ref_filepath = find_best_reference_image(transformations)
@@ -222,6 +221,7 @@ def process_dictionary(dict_to_process, outpath):
     reference_shape = reference_data.shape
 
     for filepath, params in dict_to_process.items():
+        print(f"Processing {filepath}")
         dirname=os.path.basename(filepath).split(".")[0]
         os.makedirs(os.path.join(outpath, dirname), exist_ok=True)
         print(filepath, params) #DEBUG
@@ -233,20 +233,23 @@ def process_dictionary(dict_to_process, outpath):
                 raw_data = apply_transormation(raw_data, transformation_params, output_shape=reference_shape)
             print("raw data shape", raw_data.shape)
             processing_params = params["processing_params"]
-            #yeah, maybe a few too many loops
-            for processing_param in processing_params:
-                for percentile_black in processing_param["percentile_black"]:
-                    for percentile_white in processing_param["percentile_white"]:
-                        for background_color in processing_param["background_color"]:
-                            for replace_below_black in processing_param["replace_below_black"]:
-                                for replace_above_white in processing_param["replace_above_white"]:
-                                    processed_data = process_data(raw_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
-                                    filename = f"b{percentile_black}_w{percentile_white}_nan{background_color}_bb{replace_below_black}_aw{replace_above_white}.png"
-                                    cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
+            for param_set in processing_params:
+                p_black = param_set["percentile_black"]
+                p_white = param_set["percentile_white"]
+                bg_color = param_set["background_color"]
+                replace_bb = param_set["replace_below_black"]
+                replace_aw = param_set["replace_above_white"]
+
+                for p_b, p_w, bg, r_bb, r_aw in itertools.product(p_black, p_white, bg_color, replace_bb, replace_aw):
+                    if p_w > p_b:
+                        print(f"Parameters: pb={p_b}, pw={p_w}, bg={bg}, r_bb={r_bb}, r_aw={r_aw}")
+                        processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw)
+                        filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}.png"
+                        cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
 
 
 def main():
-    outpath="C:/Users/malte/Code/astro_project/m74out"
+    outpath="C:/Users/malte/Code/astro_project/m74out_long"
     dict_to_process=PIPELINE_PARAMS
     process_dictionary(dict_to_process, outpath)
 
