@@ -1,0 +1,14 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"m74out_long/jw02107-o039_t018_miri_f770w_i2d/b60_w90_nan0_bb0_aw0.png",
+         "color":  [100, 30, 20],
+         "factor": 1
+         },
+        {"path": "m74out_long/jw02107-o039_t018_miri_f770w_i2d/b40_w100_nan0_bb0_aw0.png",
+         "color": [20, 150, 255],
+         "factor": 1
+         }
+       ]
+}

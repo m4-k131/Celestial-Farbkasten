@@ -2,52 +2,8 @@ import os
 import cv2 
 import numpy as np
 import math  
-
-INPUT_CONFIG = {
-    "operand":  "+",
-    "colorspace": "bgr",
-    "images": [
-        {"path":"C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f770w_i2d/b40_w99_nan0_bb0_aw255.png",
-         "color": [255, 40, 130],
-         "factor": 0.9
-         },
-        {"path": "C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f1000w_i2d/b20_w99_nan0_bb0_aw255.png",
-         "color": [100, 240, 0],
-         "factor": 0.9
-         },
-          {"path":"C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f1130w_i2d/b40_w99_nan0_bb0_aw255.png",
-         "color": [0, 20, 255], 
-         "factor": 1
-         },
-        {"path":"C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f2100w_i2d/b40_w100_nan0_bb0_aw0.png",
-         "color": [150, 150, 150],
-         "factor": 0.01
-         }
-    ]
-}
-
-LUMINANCE_CONFIG = {
-    "operand":  "+",
-    "colorspace": "bgr",
-    "images": [
-        {"path":"C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f770w_i2d/b40_w99_nan0_bb0_aw255.png",
-         "color": [255, 0, 0],
-         "factor": 0.8
-         },
-        {"path": "C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f1000w_i2d/b20_w99_nan0_bb0_aw255.png",
-        "color": [0, 255, 0],
-         "factor": 1.0
-         },
-          {"path":"C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f1130w_i2d/b40_w99_nan0_bb0_aw255.png",
-         "color": [0, 0, 255],
-         "factor": 0.9
-         },
-        {"path":"C:/Users/malte/Code/astro_project/m74out_long/jw02107-o039_t018_miri_f2100w_i2d/b40_w100_nan0_bb0_aw0.png",
-         "color": [255, 255, 255],
-         "factor": 0.3
-         }
-    ]
-}
+import argparse
+import json
 
 
 def combine_config(config):
@@ -56,6 +12,8 @@ def combine_config(config):
     for image_config in config["images"]:
         if "operand" in image_config:
             loaded_image = (combine_config(image_config))
+        elif image_config["path"].endswith(".json"):
+            loaded_image = combine_from_json(image_config["path"], image_config["factor"])
         else:
             loaded_image = get_color_image(image_config["path"], image_config["color"], image_config["factor"])
         if config["colorspace"] != "bgr":
@@ -70,6 +28,14 @@ def combine_config(config):
         pass 
     combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     return combined_image
+
+def combine_from_json(json_path, factor=1):
+    with open(json_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    out_image= combine_config(config)
+    if factor != 1:
+        out_image=np.clip((out_image.astype(np.float32) * factor), 0, 255).astype(np.uint8)
+    return out_image
 
 
 def get_color_image(path, color, factor):
@@ -86,5 +52,28 @@ def get_color_image(path, color, factor):
     
     return colored_image
 
-image =  combine_config(INPUT_CONFIG)
-cv2.imwrite("lower_green3.png", image)
+#image =  combine_config(INPUT_CONFIG)
+#cv2.imwrite("lower_green3.png", image)
+
+def main(input_json, imagename=None, suffix= None, outdir="outs"):
+    print(imagename)
+    with open(input_json, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    out_image= combine_config(config)
+    os.makedirs(outdir, exist_ok=True)
+    if imagename is None:
+        imagename = f'{os.path.basename(input_json).split(".")[-2]}'
+        print(imagename)
+    imagename =f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
+    cv2.imwrite(os.path.join(outdir, imagename), out_image)
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_json", required=True)
+    parser.add_argument("--imagename", required=False, help="Uses name of input_json if not given")
+    parser.add_argument("--suffix", required=False)
+    parser.add_argument("--outdir", required=False, default="outs")
+    args = parser.parse_args()
+    main(args.input_json, args.imagename, args.suffix, args.outdir)

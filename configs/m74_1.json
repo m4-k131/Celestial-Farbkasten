@@ -1,0 +1,22 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"m74out_long/jw02107-o039_t018_miri_f770w_i2d/b40_w99_nan0_bb0_aw255.png",
+         "color": [255, 40, 130],
+         "factor": 0.9
+         },
+        {"path": "m74out_long/jw02107-o039_t018_miri_f1000w_i2d/b20_w99_nan0_bb0_aw255.png",
+         "color": [100, 240, 0],
+         "factor": 0.9
+         },
+          {"path":"m74out_long/jw02107-o039_t018_miri_f1130w_i2d/b40_w99_nan0_bb0_aw255.png",
+         "color": [0, 20, 255], 
+         "factor": 1
+         },
+        {"path":"m74out_long/jw02107-o039_t018_miri_f2100w_i2d/b40_w100_nan0_bb0_aw0.png",
+         "color": [150, 150, 150],
+         "factor": 0.01
+         }
+    ]
+}
