@@ -2,6 +2,8 @@ import os
 import itertools
 import numpy as np 
 import cv2 
+import argparse
+import json
 
 import matplotlib.pyplot as plt
 from astropy.io import fits
@@ -33,36 +35,9 @@ INTERVAL_FUNCTIONS = {
     'PercentileInterval': astropy.visualization.interval.PercentileInterval,
     'ZScaleInterval': astropy.visualization.interval.ZScaleInterval,
 }
-DEFUALT_PROCESSING_PARAMS = [
 
-    {
-    "percentile_black": [20, 40, 60, 80, 85, 90],
-    "percentile_white": [25, 45, 65, 90, 95, 97, 98, 99, 99.5, 100],
-    "background_color": [0],
-    "replace_below_black": [0],
-    "replace_above_white": [0, 255],
-    }
-]
+
  
-PIPELINE_PARAMS = {
-    "C:/Users/malte/Code/astro_project/M-74/jw02107-o039_t018_miri_f770w_i2d.fits": {
-   "fits_indices":[1],
-   "processing_params": DEFUALT_PROCESSING_PARAMS
-    },
-    "C:/Users/malte/Code/astro_project/M-74/jw02107-o039_t018_miri_f1000w_i2d.fits": {
-    "fits_indices":[1],
-    "processing_params": DEFUALT_PROCESSING_PARAMS
-    },
-    "C:/Users/malte/Code/astro_project/M-74/jw02107-o039_t018_miri_f1130w_i2d.fits": {
-    "fits_indices":[1],
-    "processing_params": DEFUALT_PROCESSING_PARAMS
-    },
-    "C:/Users/malte/Code/astro_project/M-74/jw02107-o039_t018_miri_f2100w_i2d.fits": {
-    "fits_indices":[1],
-    "processing_params": DEFUALT_PROCESSING_PARAMS
-    },
-}
-
 def load_fits_data(fits_path, index=1):
     with fits.open(fits_path) as hdul:
         data = hdul[index].data
@@ -75,7 +50,6 @@ def get_normalized_images(data, plot_normalized=False):
     if plot_normalized:
         fig, ax = plt.subplots(figsize=(10, 10))
         im = ax.imshow(data, origin='lower', cmap='gray', norm=norm)
-        # Add a colorbar to see the data values
         fig.colorbar(im)
         plt.show()
     return norm(data)
@@ -85,7 +59,6 @@ def rescale_image_to_uint(source_data, percentile_black=1.0, percentile_white=99
     """
     Rescales a float image to uint8, with options to replace out-of-band values.
     """
-    # 1. Handle NaNs and calculate levels.
     nan_mask = np.isnan(source_data)
     black_level = np.nanpercentile(source_data, percentile_black)
     white_level = np.nanpercentile(source_data, percentile_white)
@@ -134,7 +107,7 @@ def find_transformations(dict_to_process):
               Returns None for pairs that could not be aligned.
     """
     transformations = {}
-    for filepath, params in dict_to_process.items():
+    for filepath, params in dict_to_process["fits_files"].items():
         print(f"Source: {filepath}")
         transformations[filepath] = {}
         try:
@@ -144,7 +117,7 @@ def find_transformations(dict_to_process):
             print(f"  Could not load source FITS {filepath}: {e}")
             continue
 
-        for other_filepath, other_params in dict_to_process.items():
+        for other_filepath, other_params in dict_to_process["fits_files"].items():
             if filepath == other_filepath:
                 transformations[filepath][other_filepath] = {'scale': (1.0, 1.0), 'translation': (0.0, 0.0), 'rotation': 0.0}
                 continue
@@ -217,10 +190,10 @@ def process_dictionary(dict_to_process, outpath):
     transformations = find_transformations(dict_to_process)
     best_ref_filepath = find_best_reference_image(transformations)
 
-    reference_data = load_fits_data(best_ref_filepath, dict_to_process[best_ref_filepath]["fits_indices"][0])
+    reference_data = load_fits_data(best_ref_filepath, dict_to_process["fits_files"][best_ref_filepath]["fits_indices"][0])
     reference_shape = reference_data.shape
 
-    for filepath, params in dict_to_process.items():
+    for filepath, params in dict_to_process["fits_files"].items():
         print(f"Processing {filepath}")
         dirname=os.path.basename(filepath).split(".")[0]
         os.makedirs(os.path.join(outpath, dirname), exist_ok=True)
@@ -232,26 +205,44 @@ def process_dictionary(dict_to_process, outpath):
                 transformation_params = transformations[filepath][best_ref_filepath]
                 raw_data = apply_transormation(raw_data, transformation_params, output_shape=reference_shape)
             print("raw data shape", raw_data.shape)
-            processing_params = params["processing_params"]
-            for param_set in processing_params:
-                p_black = param_set["percentile_black"]
-                p_white = param_set["percentile_white"]
-                bg_color = param_set["background_color"]
-                replace_bb = param_set["replace_below_black"]
-                replace_aw = param_set["replace_above_white"]
+            print( dict_to_process["processing_params"])
+            print(params["processing_params_index"])
+            print(dict_to_process["processing_params"][params["processing_params_index"]])
+            param_set = dict_to_process["processing_params"][params["processing_params_index"]]
+            #for param_set in processing_params:
+            p_black = param_set["percentile_black"]
+            p_white = param_set["percentile_white"]
+            bg_color = param_set["background_color"]
+            replace_bb = param_set["replace_below_black"]
+            replace_aw = param_set["replace_above_white"]
+            for p_b, p_w, bg, r_bb, r_aw in itertools.product(p_black, p_white, bg_color, replace_bb, replace_aw):
+                if p_w > p_b:
+                    print(f"Parameters: pb={p_b}, pw={p_w}, bg={bg}, r_bb={r_bb}, r_aw={r_aw}")
+                    processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw)
+                    filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}.png"
+                    cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
 
-                for p_b, p_w, bg, r_bb, r_aw in itertools.product(p_black, p_white, bg_color, replace_bb, replace_aw):
-                    if p_w > p_b:
-                        print(f"Parameters: pb={p_b}, pw={p_w}, bg={bg}, r_bb={r_bb}, r_aw={r_aw}")
-                        processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw)
-                        filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}.png"
-                        cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
 
+def main(input_json, outdir=None):
+    with open(input_json, "r", encoding="utf-8") as f:
+        dict_to_process = json.load(f)
+    if outdir is None:
+        try:
+            guestimated_folder = list(dict_to_process["fits_files"].keys())[0].replace("\\", "/").split("/")[0]
+        except: 
+            guestimated_folder="outs"
+        if not guestimated_folder.endswith(".fits"):
+            outdir=guestimated_folder+"_pngs"
+        else:
+            outdir="out_pngs"
+    print(f"Outdir: {outdir}")
+    os.makedirs(outdir,exist_ok=True)
+    process_dictionary(dict_to_process, outdir)
 
-def main():
-    outpath="C:/Users/malte/Code/astro_project/m74out_long"
-    dict_to_process=PIPELINE_PARAMS
-    process_dictionary(dict_to_process, outpath)
-
-#main()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_json", required=True)
+    parser.add_argument("--outdir", required=False)
+    args = parser.parse_args()
+    main(args.input_json, args.outdir)
 
