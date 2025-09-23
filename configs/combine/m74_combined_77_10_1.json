@@ -1,0 +1,12 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"configs/m74_only2_f1000w_warm-cool_switched.json",
+         "factor": 0.92
+         },
+        {"path": "configs/m74_only2_f770w_magenta_starlight_royalvoid_switched_0.json",
+         "factor": 0.4
+         }
+       ]
+}
