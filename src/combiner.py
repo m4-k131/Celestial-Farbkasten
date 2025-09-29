@@ -6,18 +6,18 @@ import argparse
 import json
 
 
-def combine_config(config):
+def combine_config(config, final_image=False):
     combined_image = None 
     images = []
     for image_config in config["images"]:
-        if "operand" in image_config:
+        if "combination" in image_config:
             loaded_image = (combine_config(image_config))
         elif image_config["path"].endswith(".json"):
             loaded_image = combine_from_json(image_config["path"], image_config["factor"])
         else:
             loaded_image = get_color_image(image_config["path"], image_config["color"], image_config["factor"])
         if config["colorspace"] != "bgr":
-            pass 
+            loaded_image = cv2.cvtColor(loaded_image, getattr(cv2, f"COLOR_BGR2{config['colorspace'].upper()}"))  
         images.append(loaded_image)
     
     for i in range(1, len(images)):
@@ -25,8 +25,9 @@ def combine_config(config):
     images = np.array(images)
     combined_image = images.sum(axis=0)
     if config["colorspace"] != "bgr":
-        pass 
-    combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
+        combined_image = cv2.cvtColor(combined_image, getattr(cv2, f"COLOR_{config['colorspace'].upper()}2BGR")) 
+    if final_image:
+        combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     return combined_image
 
 def combine_from_json(json_path, factor=1):
@@ -34,7 +35,8 @@ def combine_from_json(json_path, factor=1):
         config = json.load(f)
     out_image= combine_config(config)
     if factor != 1:
-        out_image=np.clip((out_image.astype(np.float32) * factor), 0, 255).astype(np.uint8)
+        return out_image * factor
+        #out_image=np.clip((out_image.astype(np.float32) * factor), 0, 255).astype(np.uint8)
     return out_image
 
 
@@ -52,14 +54,12 @@ def get_color_image(path, color, factor):
     
     return colored_image
 
-#image =  combine_config(INPUT_CONFIG)
-#cv2.imwrite("lower_green3.png", image)
 
 def main(input_json, imagename=None, suffix= None, outdir="outs"):
     print(imagename)
     with open(input_json, "r", encoding="utf-8") as f:
         config = json.load(f)
-    out_image= combine_config(config)
+    out_image= combine_config(config, final_image=True)
     os.makedirs(outdir, exist_ok=True)
     if imagename is None:
         imagename = f'{os.path.basename(input_json).split(".")[-2]}'
