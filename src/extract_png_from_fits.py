@@ -5,6 +5,7 @@ import cv2
 import argparse
 import json
 
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.visualization import ImageNormalize, ZScaleInterval, AsinhStretch
@@ -45,8 +46,8 @@ def load_fits_data(fits_path, index=1):
     return native_data
 
 
-def get_normalized_images(data, plot_normalized=False):
-    norm = ImageNormalize(data, interval=ZScaleInterval(), stretch=AsinhStretch())
+def get_normalized_images(data, stretch_function="AsinhStretch", plot_normalized=False):
+    norm = ImageNormalize(data, interval=ZScaleInterval(), stretch=STRETCH_FUNCTIONS[stretch_function]())
     if plot_normalized:
         fig, ax = plt.subplots(figsize=(10, 10))
         im = ax.imshow(data, origin='lower', cmap='gray', norm=norm)
@@ -88,8 +89,8 @@ def apply_transormation(source_data, transformation_params, output_shape):
     return transformed_data
 
 
-def process_data(raw_data, percentile_black=0.1, percentile_white=0.9 , background_color = 0, replace_below_black=None, replace_above_white=None):
-    normalized_data = get_normalized_images(raw_data)
+def process_data(raw_data, percentile_black=0.1, percentile_white=0.9 , background_color = 0, replace_below_black=None, replace_above_white=None, stretch_function="AsinhStretch"):
+    normalized_data = get_normalized_images(raw_data, stretch_function)
     rescaled_image = rescale_image_to_uint(normalized_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
     return rescaled_image
 
@@ -199,28 +200,38 @@ def process_dictionary(dict_to_process, outpath):
         os.makedirs(os.path.join(outpath, dirname), exist_ok=True)
         print(filepath, params) #DEBUG
         for index in params["fits_indices"]:
-            print("index", index)
             raw_data = load_fits_data(filepath, index)
             if filepath != best_ref_filepath:
                 transformation_params = transformations[filepath][best_ref_filepath]
                 raw_data = apply_transormation(raw_data, transformation_params, output_shape=reference_shape)
             print("raw data shape", raw_data.shape)
-            print( dict_to_process["processing_params"])
-            print(params["processing_params_index"])
-            print(dict_to_process["processing_params"][params["processing_params_index"]])
             param_set = dict_to_process["processing_params"][params["processing_params_index"]]
+            print("Param set", param_set)
             #for param_set in processing_params:
             p_black = param_set["percentile_black"]
             p_white = param_set["percentile_white"]
             bg_color = param_set["background_color"]
             replace_bb = param_set["replace_below_black"]
             replace_aw = param_set["replace_above_white"]
-            for p_b, p_w, bg, r_bb, r_aw in itertools.product(p_black, p_white, bg_color, replace_bb, replace_aw):
-                if p_w > p_b:
-                    print(f"Parameters: pb={p_b}, pw={p_w}, bg={bg}, r_bb={r_bb}, r_aw={r_aw}")
-                    processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw)
-                    filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}.png"
-                    cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
+            stretch_functions = param_set["stretch_function"]
+            iterator = itertools.product(p_black, p_white, bg_color, replace_bb, replace_aw, stretch_functions)
+            total_iterations = len(p_black) * len(p_white) * len(bg_color) * len(replace_bb) * len(replace_aw) * len(stretch_functions)
+            with tqdm(total=total_iterations, desc="Processing Images") as pbar:
+                for p_b, p_w, bg, r_bb, r_aw, stretch_function in iterator:
+                    if p_w > p_b:
+                        pbar.set_postfix({
+                            'pb': f'{p_b:.2f}', 
+                            'pw': f'{p_w:.2f}', 
+                            'bg': bg,
+                            'stretch': stretch_function
+                        })
+                        pbar.update(1)
+                        processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw, stretch_function)
+                        filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_function}.png"
+                        cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
+                    else:
+                        pbar.total -= 1
+                        pbar.refresh()
 
 
 def main(input_json, outdir=None):

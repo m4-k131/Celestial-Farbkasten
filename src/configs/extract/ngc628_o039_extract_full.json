@@ -1,12 +1,24 @@
 {
     "fits_files": {
-        "M-74/jw02107-o039_t018_miri_f770w_i2d.fits": {
+        "NGC-628/jw02107-o039_t018_miri_f770w_i2d.fits": {
             "fits_indices": [
                 1
             ],
             "processing_params_index": 0
         },
-        "M-74/jw02107-o039_t018_miri_f1000w_i2d.fits": {
+        "NGC-628/jw02107-o039_t018_miri_f1000w_i2d.fits": {
+            "fits_indices": [
+                1
+            ],
+            "processing_params_index": 0
+        },
+         "NGC-628/jw02107-o039_t018_miri_f1130w_i2d.fits": {
+            "fits_indices": [
+                1
+            ],
+            "processing_params_index": 0
+        },
+         "NGC-628/jw02107-o039_t018_miri_f2100w_i2d.fits": {
             "fits_indices": [
                 1
             ],
@@ -15,6 +27,12 @@
     },
     "processing_params": [
         {
+            "stretch_function": [
+                "LinearStretch",
+                "SqrtStretch",
+                "LogStretch",
+                "AsinhStretch"
+            ],
             "percentile_black": [
                 20,
                 40,
