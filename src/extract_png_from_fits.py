@@ -37,6 +37,12 @@ INTERVAL_FUNCTIONS = {
     'ZScaleInterval': astropy.visualization.interval.ZScaleInterval,
 }
 
+DEFAULT_MATCHING_PARAMS = {
+    "detection_sigma":3.0,
+    "min_area":4,
+    "max_control_points": 150
+}
+
 
  
 def load_fits_data(fits_path, index=1):
@@ -46,8 +52,8 @@ def load_fits_data(fits_path, index=1):
     return native_data
 
 
-def get_normalized_images(data, stretch_function="AsinhStretch", plot_normalized=False):
-    norm = ImageNormalize(data, interval=ZScaleInterval(), stretch=STRETCH_FUNCTIONS[stretch_function]())
+def get_normalized_images(data, stretch_function="AsinhStretch", interval="ZScaleInterval",  plot_normalized=False):
+    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[stretch_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
     if plot_normalized:
         fig, ax = plt.subplots(figsize=(10, 10))
         im = ax.imshow(data, origin='lower', cmap='gray', norm=norm)

@@ -7,11 +7,19 @@ Create False-Color-Images with a few easyt-to-use Scripts around astroquery & as
 
 
 
+
 ---
 
-#Step by Step
+# Step by Step Example
 
-To create a false color image, you need to use the scripts in the following order:
+To create a false color image, you need to use the scripts in the following order.
+Running all the commands 
+
+```
+in these boxes 
+```
+
+will create an example False Color Image for Messer 74.
 
 ## 1. query_observation_lists.py
 
@@ -55,7 +63,7 @@ This script downloads the actual data files (FITS, JPG) listed in the CSV genera
 * `--must_contain` (optional): A filter string that must be in the filename to be downloaded.
 
 As fits data can be quite large and the downloads can be rather slow, it is advisable to run with the --ignore_fits argument first. 
-Unfortunatly "same" observations can only be identified through a string in the filename. 
+Unfortunatly "same" observations can only be consistently identified through a string in the filename. 
 
 Running
 

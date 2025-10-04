@@ -47,7 +47,6 @@ def get_color_image(path, color, factor):
     gray_image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if gray_image is None:
         raise FileNotFoundError(f"Could not load image at path: {path}")
-        
     normalized_gray = gray_image.astype(np.float32) / 255.0
     color_array = np.array(color, dtype=np.float32)
     colored_image = normalized_gray[:, :, np.newaxis] * color_array * factor
