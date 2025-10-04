@@ -36,7 +36,7 @@ def download_with_tqdm(url, local_filename):
 
 def main(csv, download_jpgs=True, download_fits=True, outdir = None, must_contain=None):
     if outdir is None:
-        outdir=csv[:-4]
+        outdir=csv.split("/")[:-4]
     os.makedirs(outdir, exist_ok=True)
     print(f"Reading observation data from '{csv}'...")
     df = pd.read_csv(csv)
