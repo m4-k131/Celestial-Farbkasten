@@ -1,18 +1,47 @@
 # Astro-Imaging Scripts
 
 A collection of scripts to query, download, process, and combine astronomical data into a final image.
+Create False-Color-Images with a few easyt-to-use Scripts around astroquery & astropy
+
+## Setup
+
+
 
 ---
 
+#Step by Step
+
+To create a false color image, you need to use the scripts in the following order:
+
 ## 1. query_observation_lists.py
 
-This script queries the MAST archive for observation data of a specific target and saves the results to a CSV file.
+
+This script queries the MAST archive for observation data of a specific target and saves the results to a CSV file. You need an API key from [mast.stsci.edu](https://mast.stsci.edu/) for quering. 
+
+Export it as MAST_API_TOKEN to your environment
+
+or 
+
+create an .env file in the same directory as this README.md is in with the contents: 
+
+MAST_API_TOKEN="$YOUR_API_TOKEN_HERE" 
+
+or 
+
+simply enter it when the script asks for it. 
+
+
+Finding the exact target_name can be tricky, for example for the target_name for Messer 74 is "NGC-628". Searching for "NGC 628", "M-74" or "M74" will not yield results. Use https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html if you have trouble find the correct target_name. 
 
 * `--target_name` (required): The name of the celestial object to query.
 * `--calib_level` (optional, default: 3): The calibration level of the data.
 * `--project` (optional, default: JWST): The telescope or project to query.
-* `--outdir` (optional, default: outs_csv): The output directory for the CSV file.
+* `--outdir` (optional, default: csv): The output directory for the CSV file.
 
+### Example Usage:
+```
+python query_observation_lists.py --target_name="NGC-628"
+```
 ---
 
 ## 2. download_from_csv.py
@@ -25,6 +54,24 @@ This script downloads the actual data files (FITS, JPG) listed in the CSV genera
 * `--ignore_fits` (optional): A flag to skip downloading scientific FITS files.
 * `--must_contain` (optional): A filter string that must be in the filename to be downloaded.
 
+As fits data can be quite large and the downloads can be rather slow, it is advisable to run with the --ignore_fits argument first. 
+Unfortunatly "same" observations can only be identified through a string in the filename. 
+
+Running
+
+```
+python download_from_csv.py --csv="csv/NGC-628.csv" --ignore_fits
+```
+
+will give us JPGs of different observations. We can further select by using the --must_contain argument like this:
+
+
+```
+python download_from_csv.py ---csv="csv/NGC-628.csv" --must_contain=" "
+```
+
+This will then download the fits for the obervation with the identifier. 
+
 ---
 
 ## 3. extract_png_from_fits.py
@@ -33,6 +80,18 @@ This script processes and aligns scientific FITS files into 8-bit PNG images. It
 
 * `--input_json` (required): Path to the JSON file that configures the FITS processing.
 * `--outdir` (optional): The directory where the output PNGs will be saved.
+
+
+### Example Usage:
+
+```
+python extract_png_from_fits.py --input_json=""
+```
+
+### JSON Schema:
+
+
+
 
 ---
 
@@ -44,3 +103,11 @@ This script combines several processed PNGs into a single full-color composite i
 * `--imagename` (optional): The base name for the final output image.
 * `--suffix` (optional): A suffix to append to the output filename.
 * `--outdir` (optional, default: outs): The directory for the final image.
+
+### Example Usage:
+
+```
+python combiner.py --input_json=""
+```
+
+### JSON Schema:
