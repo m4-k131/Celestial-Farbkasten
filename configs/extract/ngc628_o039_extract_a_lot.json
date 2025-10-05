@@ -5,7 +5,7 @@
                 1
             ],
             "processing_params": [
-                "configs/__default_extract_a_lot.json"
+                "configs/extract/__default_extract_a_lot.json"
             ]
         },
         "outputs/download/NGC-628/jw02107-o039_t018_miri_f1000w_i2d.fits": {
@@ -13,7 +13,7 @@
                 1
             ],
             "processing_params": [
-                "configs/__default_extract_a_lot.json"
+                "configs/extract/__default_extract_a_lot.json"
             ]
         },
         "outputs/download/NGC-628/jw02107-o039_t018_miri_f1130w_i2d.fits": {
@@ -21,7 +21,7 @@
                 1
             ],
             "processing_params": [
-                "configs/__default_extract_a_lot.json"
+                "configs/extract/__default_extract_a_lot.json"
             ]
         },
         "outputs/download/NGC-628/jw02107-o039_t018_miri_f2100w_i2d.fits": {
@@ -29,7 +29,7 @@
                 1
             ],
             "processing_params": [
-                "configs/__default_extract_a_lot.json"
+                "configs/extract/__default_extract_a_lot.json"
             ]
         }
     }
