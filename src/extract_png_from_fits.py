@@ -135,9 +135,7 @@ def find_transformations(dict_to_process):
                 transformation, (source_list, target_list) = astroalign.find_transform(
                     source_fits, 
                     target_fits,
-                    detection_sigma=3.0,  # Lowered to find more (potentially fainter) sources
-                    min_area=4,           # Helps eliminate single hot pixels/cosmic rays
-                    max_control_points=150 # Use more stars for matching
+                    **DEFAULT_MATCHING_PARAMS
                 )
                 print(f"    -> Found transformation with {len(source_list)} matching pairs.")
                 transformations[filepath][other_filepath] = transformation.params

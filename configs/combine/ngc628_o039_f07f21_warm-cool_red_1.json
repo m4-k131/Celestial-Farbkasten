@@ -1,0 +1,14 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "comvbination": true,
+    "images": [
+        {"path":"configs/combine/ngc628_o039_combine_f21_red_stars_aggressive.json",
+         "factor": 1
+         },
+        {"path": "configs/combine/ngc628_o039_f07_warm-cool.json",
+         "factor": 1
+         }
+       ]
+      
+}
