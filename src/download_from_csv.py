@@ -3,9 +3,9 @@ import argparse
 import requests
 
 from tqdm import tqdm
-
 import pandas as pd
 
+from paths import CSV_DIR, DOWNLOAD_DIR
 
 BASE_URL = "https://mast.stsci.edu/api/v0.1/Download/file?uri="
 DEFAULT_TIMEOUT = 300
@@ -34,9 +34,9 @@ def download_with_tqdm(url, local_filename):
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
 
-def main(csv, download_jpgs=True, download_fits=True, outdir = None, must_contain=None):
+def main(csv, download_jpgs = True, download_fits = True, outdir = None, must_contain = None):
     if outdir is None:
-        outdir=csv.split("/")[:-4]
+        outdir=DOWNLOAD_DIR / os.path.basename(csv)[:-4]
     os.makedirs(outdir, exist_ok=True)
     print(f"Reading observation data from '{csv}'...")
     df = pd.read_csv(csv)
@@ -51,7 +51,8 @@ def main(csv, download_jpgs=True, download_fits=True, outdir = None, must_contai
         for uri in uris_to_download:
             if pd.notna(uri):
                 if must_contain is not None:
-                    if not uri.contains(str(must_contain)):
+                    if not str(must_contain) in uri:
+                        print(f"Skipping {uri} as it does not contain '{must_contain}'")
                         continue
                 download_url = f"{BASE_URL}{uri}"
                 filename = uri.split('/')[-1]
@@ -72,4 +73,4 @@ if __name__ == "__main__":
     parser.add_argument("--ignore_fits", action="store_true")
     parser.add_argument("--must_contain", required=False)
     args = parser.parse_args()
-    main(args.csv, not args.ignore_jpgs, not args.ignore_fits, args.outdir)
+    main(args.csv, not args.ignore_jpgs, not args.ignore_fits, args.outdir, args.must_contain)

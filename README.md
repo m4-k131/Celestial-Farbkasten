@@ -48,7 +48,7 @@ Finding the exact target_name can be tricky, for example for the target_name for
 
 ### Example Usage:
 ```
-python query_observation_lists.py --target_name="NGC-628"
+python src/query_observation_lists.py --target_name="NGC-628"
 ```
 ---
 
@@ -68,14 +68,14 @@ Unfortunatly "same" observations can only be consistently identified through a s
 Running
 
 ```
-python download_from_csv.py --csv="csv/NGC-628.csv" --ignore_fits
+python src/download_from_csv.py --csv="outputs/csv/NGC-628.csv" --ignore_fits
 ```
 
 will give us JPGs of different observations. We can further select by using the --must_contain argument like this:
 
 
 ```
-python download_from_csv.py ---csv="csv/NGC-628.csv" --must_contain=" "
+python src/download_from_csv.py --csv="outputs/csv/NGC-628.csv" --must_contain="o039"
 ```
 
 This will then download the fits for the obervation with the identifier. 
@@ -93,12 +93,88 @@ This script processes and aligns scientific FITS files into 8-bit PNG images. It
 ### Example Usage:
 
 ```
-python extract_png_from_fits.py --input_json=""
+python src/extract_png_from_fits.py --input_json="configs\extract\ngc628_o039_extract_a_lot.json"
 ```
 
 ### JSON Schema:
 
+```
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Image Processing Parameters",
+  "description": "A schema for defining parameter grids for MAST image processing normalization.",
+  "type": "object",
+  "properties": {
+    "stretch_function": {
+      "description": "A list of stretching functions to apply to the raw image data.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "LinearStretch",
+          "SqrtStretch",
+          "LogStretch",
+          "AsinhStretch"
+        ]
+      }
+    },
+    "percentile_black": {
+      "description": "A list of percentile values to map to black.",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      }
+    },
+    "percentile_white": {
+      "description": "A list of percentile values to map to white.",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      }
+    },
+    "background_color": {
+      "description": "A list of background color values, likely for masking or padding.",
+      "type": "array",
+      "items": {
+        "type": "integer"
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "replace_below_black": {
+      "description": "A list of values to replace pixels that are darker than the black point.",
+      "type": "array",
+      "items": {
+        "type": "integer"
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "replace_above_white": {
+      "description": "A list of values to replace pixels that are brighter than the white point.",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "required": [
+    "stretch_function",
+    "percentile_black",
+    "percentile_white",
+    "background_color",
+    "replace_below_black",
+    "replace_above_white"
+  ]
+}
 
+```
 
 
 ---

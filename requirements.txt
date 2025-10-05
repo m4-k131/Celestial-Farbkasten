@@ -4,3 +4,4 @@ astroalign
 astropy
 astroquery
 dotenv
+opencv-python
