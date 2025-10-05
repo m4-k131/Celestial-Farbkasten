@@ -58,7 +58,6 @@ def get_normalized_images(data, stretch_function="AsinhStretch", interval_functi
     if interval_function not in INTERVAL_FUNCTIONS:
         print(f"{interval_function=} is not a valid interval function. Available interval functions are: {INTERVAL_FUNCTIONS.keys()}. Using default ZScaleInterval")
         interval_function='ZScaleInterval'
-        
     
     norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[interval_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
     return norm(data)
@@ -144,12 +143,13 @@ def find_transformations(dict_to_process):
                 transformations[filepath][other_filepath] = transformation.params
 
             except astroalign.MaxIterError:
-                print("    -> ERROR: Could not find transformation. Max iterations reached.")
+                print("    -> Warning: Could not find transformation. Max iterations reached.")
                 transformations[filepath][other_filepath] = None # Store None if no match is found
             except Exception as e:
                 print(f"    -> ERROR: An unexpected error occurred: {e}")
                 transformations[filepath][other_filepath] = None
     return transformations
+
 
 def find_best_reference_image(transformations):
     """
@@ -191,10 +191,11 @@ def find_best_reference_image(transformations):
         print(f"  - {filename:<45}: {score:.2f}")
     best_reference = min(centrality_scores, key=centrality_scores.get)
     return best_reference
-            
+           
 
-
-def process_dictionary(dict_to_process, outpath, no_matching=False):
+def process_dictionary(dict_to_process, outpath=None, no_matching=False, overwrite=False):
+    if outpath is None:
+        outpath = EXTRACTED_PNG_DIR
 
     if not no_matching:
         transformations = find_transformations(dict_to_process)
@@ -205,8 +206,9 @@ def process_dictionary(dict_to_process, outpath, no_matching=False):
 
     for filepath, params in dict_to_process["fits_files"].items():
         print(f"Processing {filepath}")
+        observation_name = os.path.basename(filepath).split("_")[0]
         dirname=os.path.basename(filepath).split(".")[0]
-        os.makedirs(os.path.join(outpath, dirname), exist_ok=True)
+        os.makedirs(os.path.join(outpath, observation_name, dirname), exist_ok=True)
         print(filepath, params) #DEBUG
         for index in params["fits_indices"]:
             raw_data = load_fits_data(filepath, index)
@@ -236,41 +238,41 @@ def process_dictionary(dict_to_process, outpath, no_matching=False):
                 total_iterations = len(percentile_black) * len(percentile_white) * len(background_color) * len(replace_below_black) * len(replace_above_white) * len(stretch_functions) * len(interval_functions)
                 with tqdm(total=total_iterations, desc="Processing Images") as pbar:
                     for p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn in iterator:
+                        filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
+                        full_outpath = os.path.join(outpath, observation_name, dirname, filename)
                         if p_w > p_b:
-                            pbar.set_postfix({
+                            if overwrite or not os.path.isfile(full_outpath):
+                                processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
+                                cv2.imwrite(full_outpath, processed_data)
+                                pbar.set_postfix({
                                 'pb': f'{p_b:.2f}', 
                                 'pw': f'{p_w:.2f}', 
                                 'bg': bg,
-                                'stretch': stretch_fn,
-                                "interval": interval_fn
-                            })
-                            pbar.update(1)
-                            processed_data = process_data(raw_data, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
-                            filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
-                            cv2.imwrite(os.path.join(outpath, dirname, filename), processed_data)
+                                'stretch': stretch_fn[:-7],
+                                "interval": interval_fn[:-8]
+                                })
+                                pbar.update(1)
+                            else:
+                                print(f"{filename} already exists. Run this script with --overwrite to overwrite existing files. Skipping")
+                                pbar.total -= 1
+                                pbar.refresh()
                         else:
                             pbar.total -= 1
                             pbar.refresh()
 
 
-def main(input_json, outdir=None, no_matching=False):
+def main(input_json, outdir=None, no_matching=False, overwrite=False):
     with open(input_json, "r", encoding="utf-8") as f:
         dict_to_process = json.load(f)
-    if outdir is None:
-        try:
-            guestimated_folder = os.path.basename(input_json.split(".")[0])
-        except: 
-            guestimated_folder="default"
-        outdir = os.path.join(EXTRACTED_PNG_DIR, guestimated_folder)
-    print(f"Outdir: {outdir}")
-    os.makedirs(outdir,exist_ok=True)
-    process_dictionary(dict_to_process, outdir, no_matching)
+    process_dictionary(dict_to_process, outdir, no_matching, overwrite)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_json", required=True)
     parser.add_argument("--outdir", required=False)
     parser.add_argument("--no_matching", action="store_true")
+    parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
-    main(args.input_json, args.outdir, args.no_matching)
+    main(args.input_json, args.outdir, args.no_matching, args.overwrite)
 

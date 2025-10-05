@@ -1,8 +1,7 @@
 {
     "interval_function": [
         "ZScaleInterval",
-        "MinMaxInterval",
-        "ManualInterval"
+        "MinMaxInterval"
     ],
     "stretch_function": [
         "LinearStretch",
