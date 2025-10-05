@@ -6,7 +6,6 @@ import argparse
 import json
 
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.visualization import ImageNormalize, ZScaleInterval, AsinhStretch
 from skimage.transform import AffineTransform, warp
@@ -52,13 +51,15 @@ def load_fits_data(fits_path, index=1):
     return native_data
 
 
-def get_normalized_images(data, stretch_function="AsinhStretch", interval="ZScaleInterval",  plot_normalized=False):
-    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[stretch_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
-    if plot_normalized:
-        fig, ax = plt.subplots(figsize=(10, 10))
-        im = ax.imshow(data, origin='lower', cmap='gray', norm=norm)
-        fig.colorbar(im)
-        plt.show()
+def get_normalized_images(data, stretch_function="AsinhStretch", interval_function="ZScaleInterval"):
+    if stretch_function not in STRETCH_FUNCTIONS:
+        stretch_function='AsinhStretch'
+        print(f"{interval_function=} is not a valid stretch function. Available stretch functions are: {STRETCH_FUNCTIONS.keys()}. Using default AsinhStretch")
+    if interval_function not in INTERVAL_FUNCTIONS:
+        interval_function='ZScaleInterval'
+        print(f"{interval_function=} is not a valid interval function. Available interval functions are: {INTERVAL_FUNCTIONS.keys()}. Using default ZScaleInterval")
+    
+    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[interval_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
     return norm(data)
 
 

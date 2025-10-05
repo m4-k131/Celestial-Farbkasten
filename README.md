@@ -48,7 +48,7 @@ Finding the exact target_name can be tricky, for example for the target_name for
 
 ### Example Usage:
 ```
-python query_observation_lists.py --target_name="NGC-628"
+python src/query_observation_lists.py --target_name="NGC-628"
 ```
 ---
 
@@ -68,14 +68,14 @@ Unfortunatly "same" observations can only be consistently identified through a s
 Running
 
 ```
-python download_from_csv.py --csv="csv/NGC-628.csv" --ignore_fits
+python src/download_from_csv.py --csv="outputs/csv/NGC-628.csv" --ignore_fits
 ```
 
 will give us JPGs of different observations. We can further select by using the --must_contain argument like this:
 
 
 ```
-python download_from_csv.py ---csv="csv/NGC-628.csv" --must_contain=" "
+python src/download_from_csv.py --csv="outputs/csv/NGC-628.csv" --must_contain="o039"
 ```
 
 This will then download the fits for the obervation with the identifier. 
