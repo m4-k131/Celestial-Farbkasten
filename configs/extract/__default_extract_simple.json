@@ -1,25 +1,18 @@
 {
     "interval_function": [
-        "ZScaleInterval",
-        "MinMaxInterval"
+        "ZScaleInterval"
     ],
     "stretch_function": [
-        "LogStretch",
         "AsinhStretch"
     ],
     "percentile_black": [
+        5,
         20,
         40,
         60,
-        80,
-        90
+        80
     ],
     "percentile_white": [
-        5,
-        25,
-        45,
-        65,
-        90,
         95,
         98,
         99,

@@ -2,7 +2,7 @@
     "operand":  "+",
     "colorspace": "bgr",
     "images": [
-        {"path":"outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f7700w_i2d/b40_w90_nan0_bb0_aw0_Asinh_ZScale.png",
+        {"path":"outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f770w_i2d/b40_w90_nan0_bb0_aw0_Asinh_ZScale.png",
          "color":  "$RoyalVoid",
          "factor": 1
          },

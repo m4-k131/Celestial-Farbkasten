@@ -1,0 +1,14 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f1000w_i2d/b40_w90_nan0_bb0_aw0_Asinh_ZScale.png",
+         "color":  [100, 30, 20],
+         "factor": 1
+         },
+        {"path": "outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f1000w_i2d/b80_w99.5_nan0_bb0_aw255_Asinh_ZScale.png",
+         "color": [20, 150, 255],
+         "factor": 1
+         }
+       ]
+}

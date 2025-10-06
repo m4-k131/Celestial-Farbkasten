@@ -1,9 +1,0 @@
-{
-    "colorspace": "bgr",
-    "images": [
-        {"path":"outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f2100w_i2d/b90_w100_nan0_bb0_aw0_Asinh_ZScale.png",
-         "color":  [-127, -80, 255],
-         "factor": 1
-         }
-    ]
-}
