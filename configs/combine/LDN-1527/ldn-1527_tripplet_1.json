@@ -1,0 +1,18 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_f444w-f470n_i2d/b80_w100_nan0_bb0_aw255_Log_ZScale.png",
+         "color":  "$StellarCrimson",
+         "factor": 1
+         },
+        {"path": "outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_clear-f444w_i2d/b20_w99.7_nan0_bb0_aw255_Asinh_ZScale.png",
+         "color": "$CosmicGold",
+         "factor": 0.7
+         },
+         {"path": "outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_clear-f335m_i2d/b40_w99.7_nan0_bb0_aw255_Asinh_MinMax.png",
+         "color": "$CyanGas",
+         "factor": 0.7
+         }
+       ]
+}
