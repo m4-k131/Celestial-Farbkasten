@@ -1,0 +1,12 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"configs/combine/LDN-1527/ldn-1527_sextet_1.json",
+         "factor": 0.5
+         },
+        {"path": "configs/combine/LDN-1527/ldn-1527_tripplet_1.json",
+         "factor": 0.5
+         }
+       ]
+}

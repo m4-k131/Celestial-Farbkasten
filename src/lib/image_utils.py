@@ -3,24 +3,25 @@ import numpy as np
 
 def crop_and_resize(
     image: np.ndarray,
-    relative_bottom_y: float = 1.0,
+    bottom_y: float = 1.0,
     top_left: tuple[int, int] = (0, 0),
     target_resolution: tuple[int, int] = (3440, 1440),
     crop_by_target_size: bool = False
 ) -> np.ndarray | None:
     """
-    Crops and resizes an image, ensuring the target aspect ratio is maintained.
+    Crops and resizes an image, maintaining the target aspect ratio.
 
     Args:
         image (np.ndarray): The input image (H, W, C).
-        relative_bottom_y (float): The relative position of the bottom of the crop box
-                                   (e.g., 0.8 means the bottom is at 80% of image height).
-                                   Only used when crop_by_target_size is False.
+        bottom_y (float): Determines the bottom of the crop.
+                          - If > 1.0, it's treated as an ABSOLUTE y-pixel coordinate.
+                          - If <= 1.0, it's treated as a RELATIVE position (percentage of image height).
+                          Only used when crop_by_target_size is False.
         top_left (tuple[int, int]): The (y, x) coordinates for the top-left of the crop.
         target_resolution (tuple[int, int]): The final (width, height) of the output image.
         crop_by_target_size (bool): If True, crops a window with the exact dimensions of
                                     target_resolution. If False, calculates the crop window
-                                    based on relative_bottom_y and the target aspect ratio.
+                                    based on bottom_y and the target aspect ratio.
 
     Returns:
         np.ndarray | None: The processed image, or None if the crop is invalid.
@@ -36,28 +37,39 @@ def crop_and_resize(
 
     if crop_by_target_size:
         # Crop a fixed-size window directly
-        bottom_y = top_y + target_h
+        abs_bottom_y = top_y + target_h
         right_x = top_x + target_w
     else:
         # Calculate crop window to match the target aspect ratio
-        if not (0.0 < relative_bottom_y <= 1.0):
-            print("Error: relative_bottom_y must be between 0 and 1.")
-            return None
-        aspect_ratio = target_w / target_h
-        # Calculate the bottom of the crop box in absolute pixels
-        abs_bottom_y = int(relative_bottom_y * img_h)
-        # Calculate crop height
+        
+        # **NEW LOGIC**: Determine absolute bottom based on the value of bottom_y
+        if bottom_y > 1.0:
+            abs_bottom_y = int(bottom_y)
+        else: # Treat as relative
+            if not (0 < bottom_y <= 1.0):
+                print("Error: Relative bottom_y must be in the range (0, 1].")
+                return None
+            abs_bottom_y = int(bottom_y * img_h)
+
         crop_h = abs_bottom_y - top_y
         if crop_h <= 0:
-            print("Error: Calculated crop height is zero or negative.")
+            print(f"Error: Calculated crop height ({crop_h}px) is zero or negative.")
             return None
             
+        aspect_ratio = target_w / target_h
         crop_w = int(crop_h * aspect_ratio)
-        bottom_y = top_y + crop_h
         right_x = top_x + crop_w
-    if not (bottom_y <= img_h and right_x <= img_w):
-        print("Error: Calculated crop window exceeds image boundaries.")
+
+    # Ensure the calculated crop box is within the image dimensions
+    if not (abs_bottom_y <= img_h and right_x <= img_w):
+        print(f"Error: Calculated crop window [(y1:{top_y}, x1:{top_x}), (y2:{abs_bottom_y}, x2:{right_x})] "
+              f"exceeds image dimensions (H:{img_h}, W:{img_w}).")
         return None
-    cropped_image = image[top_y:bottom_y, top_x:right_x]
+        
+    # Crop the image using integer indices
+    cropped_image = image[top_y:abs_bottom_y, top_x:right_x]
+
+    # Resize the cropped image to the final target resolution
     resized_image = cv2.resize(cropped_image, target_resolution, interpolation=cv2.INTER_AREA)
+    
     return resized_image

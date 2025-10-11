@@ -69,7 +69,7 @@ def main(csv, download_jpgs = True, download_fits = True, outdir = None, must_co
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", required=True)
+    parser.add_argument("csv")
     parser.add_argument("--outdir", required=False)
     parser.add_argument("--ignore_jpgs", action="store_true")
     parser.add_argument("--ignore_fits", action="store_true")
