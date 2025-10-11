@@ -1,0 +1,18 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f770w_i2d/b20_w99_nan0_bb0_aw255_Asinh_ZScale.png",
+         "color":  [100, 30, 20],
+         "factor": 1
+         },
+        {"path": "outputs/extracted_png/jw02107-o039/jw02107-o039_t018_miri_f770w_i2d/b80_w99.5_nan0_bb0_aw255_Asinh_ZScale.png",
+         "color": [20, 150, 100],
+         "factor": 1
+         },
+         {"path":"configs/combine/ngc628_o039_combine_f10_red_stars_aggressive.json",
+         "factor": 0.5
+         }
+       ]
+       
+}

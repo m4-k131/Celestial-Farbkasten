@@ -85,7 +85,7 @@ def get_color_image(path, color, factor=1):
 def main(input_json, imagename=None, suffix= None, outdir=None):
     with open(input_json, "r", encoding="utf-8") as f:
         config = json.load(f)
-    out_image= combine_config(config, final_image=True)
+    out_image= combine_config(config, clip_image=True)
     if outdir is None:
         outdir = COLOR_IMAGE
     os.makedirs(outdir, exist_ok=True)
@@ -99,7 +99,7 @@ def main(input_json, imagename=None, suffix= None, outdir=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_json", required=True)
+    parser.add_argument("input_json")
     parser.add_argument("--imagename", required=False, help="Uses name of input_json if not given")
     parser.add_argument("--suffix", required=False)
     parser.add_argument("--outdir", required=False)

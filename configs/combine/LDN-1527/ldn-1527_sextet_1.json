@@ -1,0 +1,30 @@
+{
+    "operand":  "+",
+    "colorspace": "bgr",
+    "images": [
+        {"path":"outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_f444w-f470n_i2d/b90_w99.7_nan0_bb0_aw255_Asinh_MinMax.png",
+         "color":  "$SunsetOrange",
+         "factor": 0.4
+         },
+         {"path":"outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_f444w-f470n_i2d/b60_w100_nan0_bb0_aw255_Log_MinMax.png",
+         "color":  "$DeepCrimson",
+         "factor": 0.6
+         },
+        {"path": "outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_clear-f444w_i2d/b80_w100_nan0_bb0_aw255_Log_ZScale.png",
+         "color": "$PaleHotYellow",
+         "factor": 0.6
+         },
+         {"path": "outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_clear-f444w_i2d/b5_w100_nan0_bb0_aw255_Log_MinMax.png",
+         "color": "$OxygenTeal",
+         "factor": 0.6
+         },
+         {"path": "outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_clear-f335m_i2d/b80_w99.7_nan0_bb0_aw255_Asinh_MinMax.png",
+         "color": "$Starlight",
+         "factor": 0.4
+         },
+         {"path": "outputs/extracted_png/jw02739-o005/jw02739-o005_t004_nircam_clear-f335m_i2d/b40_w100_nan0_bb0_aw255_Log_ZScale.png",
+         "color": "$DeepSpaceBlue",
+         "factor": 0.6
+         }
+       ]
+}

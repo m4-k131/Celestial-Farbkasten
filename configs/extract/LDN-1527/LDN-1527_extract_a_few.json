@@ -1,0 +1,28 @@
+{
+    "fits_files": {
+        "outputs/download/LDN-1527/jw02739-o005_t004_nircam_clear-f444w_i2d.fits": {
+            "fits_indices": [
+                1
+            ],
+            "processing_params": [
+                "configs/extract/__default_extract_a_few.json"
+            ]
+        },
+        "outputs/download/LDN-1527/jw02739-o005_t004_nircam_clear-f335m_i2d.fits": {
+            "fits_indices": [
+                1
+            ],
+            "processing_params": [
+                "configs/extract/__default_extract_a_few.json"
+            ]
+        },
+        "outputs/download/LDN-1527/jw02739-o005_t004_nircam_f444w-f470n_i2d.fits": {
+            "fits_indices": [
+                1
+            ],
+            "processing_params": [
+                "configs/extract/__default_extract_a_few.json"
+            ]
+        }
+        }
+}

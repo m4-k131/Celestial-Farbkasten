@@ -1,0 +1,52 @@
+{
+    "fits_files": {
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f140m_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f182m_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f187n_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f212n_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f277w_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f300m_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f335m_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_clear-f360m_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_f150w2-f162m_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o001_t001_nircam_f444w-f470n_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o002_t001_nircam_clear-f115w_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        },
+        "outputs/download/TRAPEZIUM-CLUSTER-P1_actual/jw01256-o002_t001_nircam_clear-f444w_i2d.fits": {
+            "fits_indices": [1],
+            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+        }
+    }
+}
