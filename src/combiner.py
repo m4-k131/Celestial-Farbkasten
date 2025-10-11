@@ -52,6 +52,7 @@ def combine_config(config, clip_image=False):
         combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     return combined_image
 
+
 def combine_from_json(json_path, factor=1):
     with open(json_path, "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -94,7 +95,6 @@ def main(input_json, imagename=None, suffix= None, outdir=None):
         print(imagename)
     imagename =f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
     cv2.imwrite(os.path.join(outdir, imagename), out_image)
-
 
 
 if __name__ == "__main__":

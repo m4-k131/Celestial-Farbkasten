@@ -46,9 +46,6 @@ DEFAULT_MATCHING_PARAMS = {
 }
 
 
-
-
- 
 def load_fits_data(fits_path, index=1):
     with fits.open(fits_path) as hdul:
         data = hdul[index].data
@@ -58,7 +55,6 @@ def load_fits_data(fits_path, index=1):
     data = data.astype(native_float32_dtype, copy=True)
     data += 1e-9 
     return np.ascontiguousarray(data)
-    
 
 
 def get_normalized_images(data, stretch_function="AsinhStretch", interval_function="ZScaleInterval"):
@@ -121,6 +117,7 @@ def _get_wcs_footprint_polygon(filepath, hdu_index=1):
         print(f"Warning: Could not get WCS footprint for {filepath}. Skipping. Error: {e}")
         return None
 
+
 def find_best_reference_fits(dict_to_process, hdu_index=1):
     """
     Determines the best reference FITS file based on maximum sky overlap with all other files.
@@ -177,9 +174,8 @@ def setup_alignment_reference(dict_to_process):
     """
     print("--- 1. Setting Up Alignment Reference ---")
     best_ref_filepath = find_best_reference_fits(dict_to_process)
-
     if best_ref_filepath is None:
-        print("❌ Error: Could not determine a reference image.")
+        print("Error: Could not determine a reference image.")
         return None, None, None
     print(f"✅ Using '{os.path.basename(best_ref_filepath)}' as the reference for alignment.")
     # Get the primary science HDU index for the reference file
@@ -230,7 +226,8 @@ def find_best_reference_image(transformations):
         print(f"  - {filename:<45}: {score:.2f}")
     best_reference = min(centrality_scores, key=centrality_scores.get)
     return best_reference
-           
+
+
 def process_and_save_pngs(data_to_process, processing_params, output_dir, overwrite=False):
     """
     Takes a single FITS data array and generates all specified PNG variants.
@@ -242,26 +239,19 @@ def process_and_save_pngs(data_to_process, processing_params, output_dir, overwr
         overwrite (bool): Whether to overwrite existing files.
     """
     for param_set in processing_params:
-        # Load parameters from JSON if a path is provided
         if isinstance(param_set, str) and param_set.endswith(".json"):
             with open(param_set, "r", encoding="utf-8") as f:
                 param_set = json.load(f)
-
         if not isinstance(param_set, dict):
             print(f"Warning: Invalid processing parameter set found. Skipping: {param_set}")
             continue
-
-        # Create an iterator for all combinations of parameters
         param_iterator = itertools.product(
             param_set["percentile_black"], param_set["percentile_white"],
             param_set["background_color"], param_set["replace_below_black"],
             param_set["replace_above_white"], param_set["stretch_function"],
             param_set["interval_function"]
         )
-        
-        # Calculate total iterations for the progress bar
         total_iterations = len(list(itertools.product(*param_set.values())))
-
         with tqdm(total=total_iterations, desc="  -> Generating PNGs") as pbar:
             for p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn in param_iterator:
                 if p_w <= p_b:

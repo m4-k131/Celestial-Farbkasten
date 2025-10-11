@@ -13,11 +13,13 @@ DEFAULT_TIMEOUT = 300
 
 def download_with_tqdm(url, local_filename):
     """Downloads a file using tqdm for a progress bar."""
+    """
     headers = {
         "Authorization": f"token 9bc4249132e7467e851c6d24f86bc96b"
     }
+    """
     try:
-        with requests.get(url, stream=True, timeout=DEFAULT_TIMEOUT, headers=headers) as r:
+        with requests.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as r: #headers=headers
             r.raise_for_status()
             total_size = int(r.headers.get('content-length', 0))
             chunk_size = 1024 # 1 KB
@@ -34,6 +36,7 @@ def download_with_tqdm(url, local_filename):
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
     return True
+
 
 def main(csv, download_jpgs = True, download_fits = True, outdir = None, must_contain = None):
     if outdir is None:
@@ -63,8 +66,7 @@ def main(csv, download_jpgs = True, download_fits = True, outdir = None, must_co
                     download_with_tqdm(download_url, local_filepath)              
                 else:
                     print(f"{local_filepath} already exists")
-
-    print(f"\n✅ Download complete. Files are in the '{outdir}' folder.")
+    print(f"\n Download complete. Files are in the '{outdir}' folder.")
 
 
 if __name__ == "__main__":
