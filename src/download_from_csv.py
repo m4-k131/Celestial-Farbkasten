@@ -33,6 +33,7 @@ def download_with_tqdm(url, local_filename):
                     download_bar.update(size)
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
+    return True
 
 def main(csv, download_jpgs = True, download_fits = True, outdir = None, must_contain = None):
     if outdir is None:
@@ -40,6 +41,7 @@ def main(csv, download_jpgs = True, download_fits = True, outdir = None, must_co
     os.makedirs(outdir, exist_ok=True)
     print(f"Reading observation data from '{csv}'...")
     df = pd.read_csv(csv)
+    df = df[df["intentType"]=="science"]
     print(f"Starting download of {len(df) * 2} files...")
     for index, row in df.iterrows():
         uris_to_download = []
