@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import argparse
 
 def crop_and_resize(
     image: np.ndarray,
@@ -57,3 +58,23 @@ def crop_and_resize(
     cropped_image = image[top_y:abs_bottom_y, top_x:right_x]
     resized_image = cv2.resize(cropped_image, target_resolution, interpolation=cv2.INTER_AREA)
     return resized_image
+
+
+def main(image_path, out_path, bottom_y, top_left, target_resolution, crop_by_target_size):
+    image = cv2.imread(image_path)
+    cropped_image = crop_and_resize(image, bottom_y, top_left,  target_resolution, crop_by_target_size)
+    cv2.imwrite(out_path, cropped_image)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("image_path")
+    parser.add_argument("out_path")
+    parser.add_argument("target_resolution", default=(3440, 1440)) #UltraWide master race
+    parser.add_argument("--top_left", required=False, default=1)
+    parser.add_argument("--bottom_y", required=False, default=(0,0))
+    parser.add_argument("--crop_by_target_size", action="store_true")
+    args = parser.parse_args()
+    main(args.image_path, args.out_path, args.target_resolutionm, args.bottom_y, args.top_left, args.crop_by_target_size)
+    
+

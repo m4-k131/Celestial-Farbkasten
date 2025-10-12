@@ -6,12 +6,12 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor
 import json
 from tqdm import tqdm
-import sep
-import astroalign
+import warnings
+import gc 
 import astropy
 from astropy.io import fits
 from astropy.wcs import WCS
-from astropy.visualization import ImageNormalize, ZScaleInterval, AsinhStretch
+from astropy.visualization import ImageNormalize
 from astropy.wcs.utils import proj_plane_pixel_scales
 from skimage.transform import AffineTransform, warp
 from reproject import reproject_interp
@@ -62,7 +62,7 @@ def load_fits_data(fits_path, index=1):
     dtype_kind = data.dtype.kind
     native_float32_dtype = np.dtype(f'={dtype_kind}4')
     data = data.astype(native_float32_dtype, copy=True)
-    data += 1e-9 
+    #data += 1e-9 #Not needed anymore? 
     return np.ascontiguousarray(data)
 
 
@@ -82,8 +82,10 @@ def rescale_image_to_uint(source_data, percentile_black=1.0, percentile_white=99
     Rescales a float image to uint8, with options to replace out-of-band values.
     """
     nan_mask = np.isnan(source_data)
-    black_level = np.nanpercentile(source_data, percentile_black)
-    white_level = np.nanpercentile(source_data, percentile_white)
+    with warnings.catch_warnings(): #Afaik ignoring the masked values is what we want
+        warnings.filterwarnings('ignore', message=".*'partition' will ignore the 'mask' of the MaskedArray.*")
+        black_level = np.nanpercentile(source_data, percentile_black)
+        white_level = np.nanpercentile(source_data, percentile_white)
     if white_level <= black_level:
         uint8_image = np.full(source_data.shape, background_color, dtype=np.uint8)
         return uint8_image
@@ -272,9 +274,8 @@ def _worker(params, output_dir, overwrite, data_to_process):
             cv2.imwrite(full_outpath, processed_data)
         return None # Indicate success
     except Exception as e:
-        # It's good practice to catch exceptions in the worker to not kill the whole pool
         print(f"Failed on params {params}: {e}")
-        return e # Return the exception to the main process if needed
+        return e 
 
 
 def process_and_save_pngs(data_to_process, processing_params, output_dir, overwrite=False):
@@ -303,7 +304,6 @@ def process_and_save_pngs(data_to_process, processing_params, output_dir, overwr
         valid_params = [p for p in all_params if p[1] > p[0]] # p[1] is p_w, p[0] is p_b
         with ProcessPoolExecutor() as executor:
             tasks = [(params, output_dir, overwrite, data_to_process) for params in valid_params]
-            # MODIFIED LINE: Use the new helper function instead of lambda
             list(tqdm(executor.map(unpack_and_run_worker, tasks), total=len(tasks), desc="   -> Generating PNGs"))
 
 
@@ -344,6 +344,8 @@ def process_dictionary_wcs(dict_to_process, outpath=None, no_matching=False, ove
                     image_output_dir, 
                     overwrite
                 )
+                del data_to_process
+                gc.collect()
             else:
                 print(f"ERROR: Failed to load or align data for HDU {index}. Skipping.")
     print("\nProcessing complete.")
