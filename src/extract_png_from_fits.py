@@ -3,6 +3,7 @@ import itertools
 import numpy as np 
 import cv2 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 import json
 from tqdm import tqdm
 import sep
@@ -45,6 +46,13 @@ DEFAULT_MATCHING_PARAMS = {
     "min_area":4,
     "max_control_points": 150
 }
+
+def unpack_and_run_worker(args):
+    """
+    Helper function to unpack arguments and call the main worker.
+    This is needed because executor.map passes a single argument.
+    """
+    return _worker(*args)
 
 
 def load_fits_data(fits_path, index=1):
@@ -117,7 +125,8 @@ def _get_wcs_footprint_polygon(filepath, hdu_index=1):
     except Exception as e:
         print(f"Warning: Could not get WCS footprint for {filepath}. Skipping. Error: {e}")
         return None
-    
+   
+
 def find_optimal_reference_image(dict_to_process, hdu_index=1):
     """
     Finds the optimal reference image by first identifying the highest resolution group,
@@ -250,6 +259,23 @@ def find_best_reference_image(transformations):
     best_reference = min(centrality_scores, key=centrality_scores.get)
     return best_reference
 
+def _worker(params, output_dir, overwrite, data_to_process):
+    """
+    A single unit of work. Processes and saves one image based on params.
+    """
+    p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn = params
+    try:
+        filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
+        full_outpath = os.path.join(output_dir, filename)
+        if overwrite or not os.path.exists(full_outpath):
+            processed_data = process_data(data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
+            cv2.imwrite(full_outpath, processed_data)
+        return None # Indicate success
+    except Exception as e:
+        # It's good practice to catch exceptions in the worker to not kill the whole pool
+        print(f"Failed on params {params}: {e}")
+        return e # Return the exception to the main process if needed
+
 
 def process_and_save_pngs(data_to_process, processing_params, output_dir, overwrite=False):
     """
@@ -260,7 +286,7 @@ def process_and_save_pngs(data_to_process, processing_params, output_dir, overwr
         processing_params (list): A list of processing parameter sets (dicts or JSON paths).
         output_dir (str): The directory to save the generated PNG files.
         overwrite (bool): Whether to overwrite existing files.
-    """
+    """ 
     for param_set in processing_params:
         if isinstance(param_set, str) and param_set.endswith(".json"):
             with open(param_set, "r", encoding="utf-8") as f:
@@ -268,24 +294,17 @@ def process_and_save_pngs(data_to_process, processing_params, output_dir, overwr
         if not isinstance(param_set, dict):
             print(f"Warning: Invalid processing parameter set found. Skipping: {param_set}")
             continue
-        param_iterator = itertools.product(
-            param_set["percentile_black"], param_set["percentile_white"],
-            param_set["background_color"], param_set["replace_below_black"],
-            param_set["replace_above_white"], param_set["stretch_function"],
-            param_set["interval_function"]
+        all_params = itertools.product(
+        param_set["percentile_black"], param_set["percentile_white"],
+        param_set["background_color"], param_set["replace_below_black"],
+        param_set["replace_above_white"], param_set["stretch_function"],
+        param_set["interval_function"]
         )
-        total_iterations = len(list(itertools.product(*param_set.values())))
-        with tqdm(total=total_iterations, desc="  -> Generating PNGs") as pbar:
-            for p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn in param_iterator:
-                if p_w <= p_b:
-                    pbar.update(1)
-                    continue
-                filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
-                full_outpath = os.path.join(output_dir, filename)
-                if overwrite or not os.path.exists(full_outpath):
-                    processed_data = process_data(data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
-                    cv2.imwrite(full_outpath, processed_data)
-                pbar.update(1)
+        valid_params = [p for p in all_params if p[1] > p[0]] # p[1] is p_w, p[0] is p_b
+        with ProcessPoolExecutor() as executor:
+            tasks = [(params, output_dir, overwrite, data_to_process) for params in valid_params]
+            # MODIFIED LINE: Use the new helper function instead of lambda
+            list(tqdm(executor.map(unpack_and_run_worker, tasks), total=len(tasks), desc="   -> Generating PNGs"))
 
 
 def process_dictionary_wcs(dict_to_process, outpath=None, no_matching=False, overwrite=False):

@@ -38,16 +38,12 @@ def combine_config(config, clip_image=False):
                 loaded_image = np.clip(loaded_image, 0,255)
         else:
             loaded_image = get_color_image(image_config["path"], image_config["color"], image_config["factor"])
-        if config["colorspace"] != "bgr":
-            loaded_image = cv2.cvtColor(loaded_image, getattr(cv2, f"COLOR_BGR2{config['colorspace'].upper()}"))  
         images.append(loaded_image)
-    
+
     for i in range(1, len(images)):
         assert images[i-1].shape == images[i].shape
     images = np.array(images)
     combined_image = images.sum(axis=0)
-    if config["colorspace"] != "bgr":
-        combined_image = cv2.cvtColor(combined_image, getattr(cv2, f"COLOR_{config['colorspace'].upper()}2BGR")) 
     if clip_image:
         combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     return combined_image
