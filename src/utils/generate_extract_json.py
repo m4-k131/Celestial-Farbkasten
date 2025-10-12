@@ -1,6 +1,7 @@
 import os
 import json
 import glob
+import argparse
 
 def generate_fits_config(target_dir, output_file=None):
     """
@@ -29,6 +30,33 @@ def generate_fits_config(target_dir, output_file=None):
     else:
         print(json.dumps(final_json, indent=4))
 
-directory_path = "outputs/download/NGC5236-NIRCAM"
-generate_fits_config(directory_path)
+def generate_combine_config(target_dir, output_file=None):
+    final_json = {
+    "operand":  "+",
+    "images": []}
+    for folder in sorted(os.listdir(target_dir)):
+        if os.path.isdir(os.path.join(target_dir, folder)):
+            image_dict = {"path": os.path.join(target_dir, folder, "$IMAGE.png"),
+            "color": "$Colorl", #maybe match clear-f444w str in folder to colors
+            "factor": 0.7
+            }
+            final_json["images"].append(image_dict)
+    if output_file:
+        with open(output_file, 'w') as f:
+            json.dump(final_json, f, indent=4)
+        print(f"Configuration saved to {output_file}")
+    else:
+        print(json.dumps(final_json, indent=4))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("target_dir")
+    parser.add_argument("--output_file")
+    parser.add_argument("--combine_config", action="store_true")
+    parser.add_argument("--fits_config", action="store_true")
+    args = parser.parse_args()
+    if args.combine_config:
+        generate_combine_config(args.target_dir, args.output_file)
+    if args.fits_config:
+        generate_fits_config(args.target_dir, args.output_file)
 
