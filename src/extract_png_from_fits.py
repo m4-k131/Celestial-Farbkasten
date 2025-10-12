@@ -4,6 +4,7 @@ import numpy as np
 import cv2 
 import argparse
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import shared_memory
 import json
 from tqdm import tqdm
 import warnings
@@ -15,6 +16,7 @@ from astropy.visualization import ImageNormalize
 from astropy.wcs.utils import proj_plane_pixel_scales
 from skimage.transform import AffineTransform, warp
 from reproject import reproject_interp
+
 from shapely.geometry import Polygon
 
 from paths import EXTRACTED_PNG_DIR
@@ -52,7 +54,12 @@ def unpack_and_run_worker(args):
     Helper function to unpack arguments and call the main worker.
     This is needed because executor.map passes a single argument.
     """
-    return _worker(*args)
+    shm_name, shape, dtype = args[-3:]
+    existing_shm = shared_memory.SharedMemory(name=shm_name)
+    data_to_process = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
+    result = result = _worker(args[0], args[1], data_to_process)
+    existing_shm.close()
+    return result
 
 
 def load_fits_data(fits_path, index=1):
@@ -89,13 +96,22 @@ def rescale_image_to_uint(source_data, percentile_black=1.0, percentile_white=99
     if white_level <= black_level:
         uint8_image = np.full(source_data.shape, background_color, dtype=np.uint8)
         return uint8_image
-    rescaled_float = 255 * (source_data - black_level) / (white_level - black_level)
-    clipped_float = np.clip(rescaled_float, 0, 255)
-    np.nan_to_num(clipped_float, copy=False, nan=0)
-    uint8_image = clipped_float.astype(np.uint8)
+    temp_float = np.empty(source_data.shape, dtype=np.float32)
+
+    # Perform all arithmetic and clipping operations in-place on the temp array.
+    denominator = white_level - black_level
+    if denominator == 0: denominator = 1 # Avoid division by zero
+    
+    np.subtract(source_data, black_level, out=temp_float)
+    np.divide(temp_float, denominator, out=temp_float)
+    np.multiply(temp_float, 255, out=temp_float)
+    np.clip(temp_float, 0, 255, out=temp_float)
+    np.nan_to_num(temp_float, copy=False, nan = background_color)
+    uint8_image = temp_float.astype(np.uint8)
+    del temp_float
 
     if replace_below_black is not None:
-        below_mask = source_data < black_level
+        below_mask = (~nan_mask) & (source_data < black_level)
         uint8_image[below_mask] = replace_below_black
     if replace_above_white is not None:
         above_mask = source_data > white_level
@@ -112,6 +128,7 @@ def apply_transormation(source_data, transformation_params, output_shape):
 
 def process_data(raw_data, percentile_black=0.1, percentile_white=0.9 , background_color = 0, replace_below_black=None, replace_above_white=None, stretch_function="AsinhStretch", interval_function="ZScaleInterval"):
     normalized_data = get_normalized_images(raw_data, stretch_function, interval_function)
+    normalized_data = normalized_data.astype(np.float32) #prevent upcasting
     rescaled_image = rescale_image_to_uint(normalized_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
     return rescaled_image
 
@@ -261,21 +278,27 @@ def find_best_reference_image(transformations):
     best_reference = min(centrality_scores, key=centrality_scores.get)
     return best_reference
 
-def _worker(params, output_dir, overwrite, data_to_process):
+def _worker(params, output_dir, data_to_process):
     """
     A single unit of work. Processes and saves one image based on params.
+    Now receives the reconstructed numpy array.
     """
     p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn = params
     try:
         filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
         full_outpath = os.path.join(output_dir, filename)
-        if overwrite or not os.path.exists(full_outpath):
+        
+        # The overwrite check is better handled in the main process
+        # before submitting the task, but for simplicity, we can
+        # leave it here. If you need to optimize further, you
+        # could filter out existing files before creating the task list.
+        if not os.path.exists(full_outpath): # Assuming overwrite=False behavior for this example
             processed_data = process_data(data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
             cv2.imwrite(full_outpath, processed_data)
         return None # Indicate success
     except Exception as e:
         print(f"Failed on params {params}: {e}")
-        return e 
+        return e
 
 
 def process_and_save_pngs(data_to_process, processing_params, output_dir, overwrite=False):
@@ -288,23 +311,45 @@ def process_and_save_pngs(data_to_process, processing_params, output_dir, overwr
         output_dir (str): The directory to save the generated PNG files.
         overwrite (bool): Whether to overwrite existing files.
     """ 
-    for param_set in processing_params:
-        if isinstance(param_set, str) and param_set.endswith(".json"):
-            with open(param_set, "r", encoding="utf-8") as f:
-                param_set = json.load(f)
-        if not isinstance(param_set, dict):
-            print(f"Warning: Invalid processing parameter set found. Skipping: {param_set}")
-            continue
-        all_params = itertools.product(
-        param_set["percentile_black"], param_set["percentile_white"],
-        param_set["background_color"], param_set["replace_below_black"],
-        param_set["replace_above_white"], param_set["stretch_function"],
-        param_set["interval_function"]
-        )
-        valid_params = [p for p in all_params if p[1] > p[0]] # p[1] is p_w, p[0] is p_b
-        with ProcessPoolExecutor() as executor:
-            tasks = [(params, output_dir, overwrite, data_to_process) for params in valid_params]
-            list(tqdm(executor.map(unpack_and_run_worker, tasks), total=len(tasks), desc="   -> Generating PNGs"))
+    shm = shared_memory.SharedMemory(create=True, size=data_to_process.nbytes)
+    # Create a NumPy array that uses the shared memory buffer
+    shm_np_array = np.ndarray(data_to_process.shape, dtype=data_to_process.dtype, buffer=shm.buf)
+    # Copy the FITS data into the shared memory array
+    shm_np_array[:] = data_to_process[:]
+    try:
+        for param_set in processing_params:
+            print(param_set)
+            if isinstance(param_set, str) and param_set.endswith(".json"):
+                with open(param_set, "r", encoding="utf-8") as f:
+                    param_set = json.load(f)
+            if not isinstance(param_set, dict):
+                print(f"Warning: Invalid processing parameter set found. Skipping: {param_set}")
+                continue
+            all_params = itertools.product(
+            param_set["percentile_black"], param_set["percentile_white"],
+            param_set["background_color"], param_set["replace_below_black"],
+            param_set["replace_above_white"], param_set["stretch_function"],
+            param_set["interval_function"]
+            )
+            valid_params = [p for p in all_params if p[1] > p[0]] # p[1] is p_w, p[0] is p_b
+            #print(valid_params, valid_params)
+            tasks_to_run = []
+            for params in valid_params:
+                p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn = params
+                filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
+                full_outpath = os.path.join(output_dir, filename)
+                if overwrite or not os.path.exists(full_outpath):
+                    # Pass params, output_dir, and the SHARED MEMORY info, not the actual data
+                    tasks_to_run.append((params, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
+            if not tasks_to_run:
+                print("   -> All PNGs already exist. Skipping generation.")
+                continue
+            with ProcessPoolExecutor() as executor:
+                list(tqdm(executor.map(unpack_and_run_worker, tasks_to_run), total=len(tasks_to_run), desc="   -> Generating PNGs"))
+    finally:
+        shm.close()
+        shm.unlink()
+
 
 
 def process_dictionary_wcs(dict_to_process, outpath=None, no_matching=False, overwrite=False):
