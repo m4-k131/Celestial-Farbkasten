@@ -11,6 +11,7 @@ import astropy
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.visualization import ImageNormalize, ZScaleInterval, AsinhStretch
+from astropy.wcs.utils import proj_plane_pixel_scales
 from skimage.transform import AffineTransform, warp
 from reproject import reproject_interp
 from shapely.geometry import Polygon
@@ -116,48 +117,70 @@ def _get_wcs_footprint_polygon(filepath, hdu_index=1):
     except Exception as e:
         print(f"Warning: Could not get WCS footprint for {filepath}. Skipping. Error: {e}")
         return None
-
-
-def find_best_reference_fits(dict_to_process, hdu_index=1):
+    
+def find_optimal_reference_image(dict_to_process, hdu_index=1):
     """
-    Determines the best reference FITS file based on maximum sky overlap with all other files.
+    Finds the optimal reference image by first identifying the highest resolution group,
+    then finding the image with the best geometric overlap within that group.
 
     Args:
         dict_to_process (dict): The input dictionary containing filepaths.
         hdu_index (int): The index of the HDU containing the science data and WCS.
 
     Returns:
-        str: The filepath of the FITS file with the most overlap, or None if it fails.
+        str: The filepath of the optimal reference FITS file.
     """
     filepaths = list(dict_to_process["fits_files"].keys())
-    if len(filepaths) < 2:
-        return filepaths[0] if filepaths else None
-    print("Calculating WCS footprints for all images...")
-    # Pre-calculate all footprints to avoid re-opening files
-    footprints = {path: _get_wcs_footprint_polygon(path, hdu_index) for path in filepaths}
-    overlap_scores = {}
-    print("Calculating total overlap scores for each image...")
-    for i, candidate_path in enumerate(filepaths):
-        candidate_poly = footprints[candidate_path]
-        if candidate_poly is None:
+    if not filepaths: return None
+    print("--- 1. Identifying Highest Resolution Group ---")
+    # Step 1: Calculate pixel scale for every image
+    scales = {}
+    for filepath in filepaths:
+        try:
+            with fits.open(filepath) as hdul:
+                wcs = WCS(hdul[hdu_index].header)
+                if not wcs.is_celestial: continue
+                # proj_plane_pixel_scales returns scale in degrees/pixel
+                pixel_scale = np.mean(proj_plane_pixel_scales(wcs))
+                scales[filepath] = pixel_scale
+                print(f"  - '{os.path.basename(filepath)}': Scale={pixel_scale * 3600:.4f} arcsec/pixel")
+        except Exception:
             continue
-        total_overlap_area = 0.0
-        for j, other_path in enumerate(filepaths):
-            if i == j:
-                continue
-            other_poly = footprints[other_path]
-            if other_poly is None:
-                continue
-            # Calculate the area of the intersection between the two polygons
-            intersection_area = candidate_poly.intersection(other_poly).area
-            total_overlap_area += intersection_area
-        overlap_scores[candidate_path] = total_overlap_area
-        print(f"  - Score for {candidate_path.split('/')[-1]}: {total_overlap_area:.4f}")
-    if not overlap_scores:
-        print("Error: Could not calculate overlap scores for any images.")
+    if not scales:
+        print("Error: Could not determine pixel scales for any images.")
         return None
+    # Step 2: Find the maximum scale (lowest resolution) and identify all candidates
+    max_pixel_scale = max(scales.values())
+    lowest_res_candidates = [
+        path for path, scale in scales.items() 
+        if np.isclose(scale, max_pixel_scale)
+    ]
+    print(f"\nFound {len(lowest_res_candidates)} candidate(s) at lowest resolution (~{max_pixel_scale * 3600:.4f} arcsec/pixel).")
+    if len(lowest_res_candidates) == 1:
+        best_reference_path = lowest_res_candidates[0]
+        print(f"Optimal reference is the sole lowest-resolution image: '{os.path.basename(best_reference_path)}'")
+        return best_reference_path
+    # --- 2. Optimizing Within the High-Resolution Group ---
+    print("\n--- 2. Finding Best Overlap Within Lowest-Res Group ---")
+    # Pre-calculate footprints for the candidates
+    footprints = {path: _get_wcs_footprint_polygon(path, hdu_index) for path in lowest_res_candidates}
+    overlap_scores = {}
+    for candidate_path in lowest_res_candidates:
+        candidate_poly = footprints[candidate_path]
+        if candidate_poly is None: continue
+        total_overlap_area = 0.0
+        for other_path in lowest_res_candidates:
+            if candidate_path == other_path: continue
+            other_poly = footprints[other_path]
+            if other_poly is None: continue
+            total_overlap_area += candidate_poly.intersection(other_poly).area
+        overlap_scores[candidate_path] = total_overlap_area
+        print(f"  - Overlap score for {os.path.basename(candidate_path)}: {total_overlap_area:.4f}")
+    if not overlap_scores:
+        print("Error: Could not calculate overlap scores. Returning first candidate.")
+        return lowest_res_candidates[0]
     best_reference_path = max(overlap_scores, key=overlap_scores.get)
-    print(f"\n Best reference image found: {best_reference_path}")
+    print(f"Optimal reference is '{os.path.basename(best_reference_path)}' (best overlap in low-res group).")
     return best_reference_path
 
 
@@ -173,11 +196,11 @@ def setup_alignment_reference(dict_to_process):
                or (None, None, None) if it fails.
     """
     print("--- 1. Setting Up Alignment Reference ---")
-    best_ref_filepath = find_best_reference_fits(dict_to_process)
+    best_ref_filepath = find_optimal_reference_image(dict_to_process)
     if best_ref_filepath is None:
         print("Error: Could not determine a reference image.")
         return None, None, None
-    print(f"✅ Using '{os.path.basename(best_ref_filepath)}' as the reference for alignment.")
+    print(f"Using '{os.path.basename(best_ref_filepath)}' as the reference for alignment.")
     # Get the primary science HDU index for the reference file
     ref_hdu_index = dict_to_process["fits_files"][best_ref_filepath]["fits_indices"][0]
     with fits.open(best_ref_filepath) as ref_hdul:
@@ -255,17 +278,13 @@ def process_and_save_pngs(data_to_process, processing_params, output_dir, overwr
         with tqdm(total=total_iterations, desc="  -> Generating PNGs") as pbar:
             for p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn in param_iterator:
                 if p_w <= p_b:
-                    pbar.update(1) # Skip invalid percentile ranges
+                    pbar.update(1)
                     continue
-
                 filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
                 full_outpath = os.path.join(output_dir, filename)
-
                 if overwrite or not os.path.exists(full_outpath):
-                    # Assuming process_data is a function you have defined elsewhere
                     processed_data = process_data(data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
                     cv2.imwrite(full_outpath, processed_data)
-                
                 pbar.update(1)
 
 

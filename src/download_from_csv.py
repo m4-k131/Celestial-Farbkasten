@@ -13,13 +13,8 @@ DEFAULT_TIMEOUT = 300
 
 def download_with_tqdm(url, local_filename):
     """Downloads a file using tqdm for a progress bar."""
-    """
-    headers = {
-        "Authorization": f"token 9bc4249132e7467e851c6d24f86bc96b"
-    }
-    """
     try:
-        with requests.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as r: #headers=headers
+        with requests.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as r:
             r.raise_for_status()
             total_size = int(r.headers.get('content-length', 0))
             chunk_size = 1024 # 1 KB
