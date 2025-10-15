@@ -26,6 +26,33 @@ COLORS = {
     "$DeepRuby": (60, 0, 240)
 }
 
+def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5, contrast_scale: float = 1.2) -> np.ndarray:
+    """
+    Adjusts the saturation and contrast of an image.
+    Saturation is adjusted first, then contrast, to prevent color data loss.
+
+    Args:
+        image: The input image in BGR format (standard for OpenCV).
+        saturation_scale: Factor to scale saturation. >1 increases, <1 decreases.
+        contrast_scale: Factor to scale value/contrast. >1 increases, <1 decreases.
+
+    Returns:
+        The adjusted image in BGR format.
+    """
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv_image)
+    if saturation_scale:
+        s = s.astype(np.float32)
+        s = np.clip(s * saturation_scale, 0, 255)
+        s = s.astype(np.uint8)
+    if contrast_scale:
+        v = v.astype(np.float32)
+        v = np.clip(v * contrast_scale, 0, 255)
+        v = v.astype(np.uint8)
+    final_hsv = cv2.merge([h, s, v])
+    adjusted_image = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
+    return adjusted_image
+
 def combine_config(config, clip_image=False):
     combined_image = None 
     images = []
@@ -38,19 +65,20 @@ def combine_config(config, clip_image=False):
                 loaded_image = np.clip(loaded_image, 0,255)
         else:
             loaded_image = get_color_image(image_config["path"], image_config["color"], image_config["factor"])
-        if config["colorspace"] != "bgr":
-            loaded_image = cv2.cvtColor(loaded_image, getattr(cv2, f"COLOR_BGR2{config['colorspace'].upper()}"))  
         images.append(loaded_image)
-    
+
     for i in range(1, len(images)):
         assert images[i-1].shape == images[i].shape
     images = np.array(images)
     combined_image = images.sum(axis=0)
-    if config["colorspace"] != "bgr":
-        combined_image = cv2.cvtColor(combined_image, getattr(cv2, f"COLOR_{config['colorspace'].upper()}2BGR")) 
     if clip_image:
         combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
+    post_process = config.get("post_process")
+    if post_process:
+        combined_image = adjust_saturation_contrast(combined_image, post_process.get("saturation"), post_process.get("contrast"))
+
     return combined_image
+
 
 def combine_from_json(json_path, factor=1):
     with open(json_path, "r", encoding="utf-8") as f:
@@ -94,7 +122,6 @@ def main(input_json, imagename=None, suffix= None, outdir=None):
         print(imagename)
     imagename =f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
     cv2.imwrite(os.path.join(outdir, imagename), out_image)
-
 
 
 if __name__ == "__main__":

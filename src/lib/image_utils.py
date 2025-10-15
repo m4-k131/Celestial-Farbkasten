@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import argparse
 
 def crop_and_resize(
     image: np.ndarray,
@@ -29,20 +30,13 @@ def crop_and_resize(
     img_h, img_w = image.shape[:2]
     target_w, target_h = target_resolution
     top_y, top_x = top_left
-
-    # Ensure top_left coordinates are valid
     if not (0 <= top_y < img_h and 0 <= top_x < img_w):
         print("Error: top_left coordinate is outside the image boundaries.")
         return None
-
     if crop_by_target_size:
-        # Crop a fixed-size window directly
         abs_bottom_y = top_y + target_h
         right_x = top_x + target_w
     else:
-        # Calculate crop window to match the target aspect ratio
-        
-        # **NEW LOGIC**: Determine absolute bottom based on the value of bottom_y
         if bottom_y > 1.0:
             abs_bottom_y = int(bottom_y)
         else: # Treat as relative
@@ -50,26 +44,39 @@ def crop_and_resize(
                 print("Error: Relative bottom_y must be in the range (0, 1].")
                 return None
             abs_bottom_y = int(bottom_y * img_h)
-
         crop_h = abs_bottom_y - top_y
         if crop_h <= 0:
             print(f"Error: Calculated crop height ({crop_h}px) is zero or negative.")
             return None
-            
         aspect_ratio = target_w / target_h
         crop_w = int(crop_h * aspect_ratio)
         right_x = top_x + crop_w
-
-    # Ensure the calculated crop box is within the image dimensions
     if not (abs_bottom_y <= img_h and right_x <= img_w):
         print(f"Error: Calculated crop window [(y1:{top_y}, x1:{top_x}), (y2:{abs_bottom_y}, x2:{right_x})] "
               f"exceeds image dimensions (H:{img_h}, W:{img_w}).")
         return None
-        
-    # Crop the image using integer indices
     cropped_image = image[top_y:abs_bottom_y, top_x:right_x]
-
-    # Resize the cropped image to the final target resolution
     resized_image = cv2.resize(cropped_image, target_resolution, interpolation=cv2.INTER_AREA)
-    
     return resized_image
+
+
+def main(image_path, out_path, target_resolution, bottom_y, top_left, crop_by_target_size):
+    image = cv2.imread(image_path)
+    cropped_image = crop_and_resize(image, bottom_y, top_left,  target_resolution, crop_by_target_size)
+    cv2.imwrite(out_path, cropped_image)
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("image_path")
+    parser.add_argument("out_path")
+    parser.add_argument("--target_resolution", required=False, default=(3440, 1440)) #UltraWide master race
+    parser.add_argument("--top_left_x", required=False, default=0)
+    parser.add_argument("--top_left_y", required=False, default=0)
+    parser.add_argument("--bottom_y", required=False, default=1)
+    parser.add_argument("--crop_by_target_size", action="store_true")
+    args = parser.parse_args()
+    main(args.image_path, args.out_path, args.target_resolution, float(args.bottom_y), (int(args.top_left_y), int(args.top_left_x)), args.crop_by_target_size)
+    
+
