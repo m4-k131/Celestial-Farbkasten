@@ -1,0 +1,6 @@
+# .pylintrc
+[MASTER]
+
+
+[TYPECHECK]
+generated-members=numpy.*, cv2.*
