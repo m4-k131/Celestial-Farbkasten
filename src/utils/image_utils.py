@@ -67,7 +67,6 @@ def main(image_path, out_path, target_resolution, bottom_y, top_left, crop_by_ta
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("image_path")
     parser.add_argument("out_path")
