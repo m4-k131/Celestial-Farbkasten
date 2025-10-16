@@ -36,9 +36,9 @@ def generate_combine_config(target_dir, output_file=None):
     "images": []}
     for folder in sorted(os.listdir(target_dir)):
         if os.path.isdir(os.path.join(target_dir, folder)):
-            image_dict = {"path": os.path.join(target_dir, folder, "$IMAGE.png"),
-            "color": "$Colorl", #maybe match clear-f444w str in folder to colors
-            "factor": 0.7
+            image_dict = {"path": os.path.join(target_dir, folder, "b5_w100_nan0_bb0_aw255_Asinh_ZScale.png"), #jw01783-o001
+            "color": [255, 255, 255],
+            "factor": 1/len(os.listdir(target_dir))
             }
             final_json["images"].append(image_dict)
     if output_file:
