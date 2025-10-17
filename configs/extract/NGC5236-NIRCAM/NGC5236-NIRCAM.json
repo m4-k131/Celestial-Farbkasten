@@ -2,35 +2,35 @@
     "fits_files": {
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f115w_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f150w_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f187n_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f200w_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f300m_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f335m_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_clear-f444w_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         },
         "outputs/download/NGC5236-NIRCAM/jw01783-o001_t001_nircam_f405n-f444w_i2d.fits": {
             "fits_indices": [1],
-            "processing_params": ["configs/extract/__default_extract_a_few.json"]
+            "processing_params": ["configs/extract/__default_extract_a_few_more.json"]
         }
     }
 }
