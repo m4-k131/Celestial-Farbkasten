@@ -1,10 +1,9 @@
-import os
-import cv2
-import numpy as np
-import math
 import argparse
 import json
+import os
 
+import cv2
+import numpy as np
 from lib.colors import COLORS
 from paths import COLOR_IMAGE
 
@@ -42,7 +41,7 @@ def combine_config(config, clip_image=False):
     images = []
     for image_config in config["images"]:
         if "combination" in image_config:
-            loaded_image = (combine_config(image_config))
+            loaded_image = combine_config(image_config)
         elif image_config["path"].endswith(".json"):
             loaded_image = combine_from_json(
                 image_config["path"], image_config["factor"])

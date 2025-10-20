@@ -1,11 +1,10 @@
+import argparse
 import os
 from getpass import getpass
-from dotenv import load_dotenv
+
 from astroquery.mast import Observations
-import argparse
-
+from dotenv import load_dotenv
 from paths import CSV_DIR
-
 
 # pylint:disable=no-member
 
@@ -26,8 +25,8 @@ def main(target_name, exact_name=False, calib_levle=3, project="JWST", outdir=No
     else:
         print("Successfully loaded API token.")
 
-    session = Observations.login(api_token)
-    sessioninfo = Observations.session_info()
+    _ = Observations.login(api_token)
+    #sessioninfo = Observations.session_info()
     # print(sessioninfo)
     if not exact_name:
         target_name = f"*{target_name}*"

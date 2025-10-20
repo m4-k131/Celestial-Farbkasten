@@ -1,11 +1,10 @@
-import os
 import argparse
-import requests
+import os
 
-from tqdm import tqdm
 import pandas as pd
-
-from paths import CSV_DIR, DOWNLOAD_DIR
+import requests
+from paths import DOWNLOAD_DIR
+from tqdm import tqdm
 
 BASE_URL = "https://mast.stsci.edu/api/v0.1/Download/file?uri="
 DEFAULT_TIMEOUT = 300
@@ -41,7 +40,7 @@ def main(csv, download_jpgs=True, download_fits=True, outdir=None, must_contain=
     df = pd.read_csv(csv)
     df = df[df["intentType"] == "science"]
     print(f"Starting download of {len(df) * 2} files...")
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         uris_to_download = []
         if download_jpgs:
             uris_to_download.append(row['jpegURL'])

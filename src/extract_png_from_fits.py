@@ -1,26 +1,24 @@
-import os
-import itertools
-import numpy as np
-import cv2
 import argparse
+import gc
+import itertools
+import json
+import os
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import shared_memory
-import json
-from tqdm import tqdm
-import warnings
-import gc
+
 import astropy
+import cv2
+import numpy as np
 from astropy.io import fits
-from astropy.wcs import WCS
 from astropy.visualization import ImageNormalize
+from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from skimage.transform import AffineTransform, warp
-from reproject import reproject_interp
-
-from shapely.geometry import Polygon
-
 from paths import EXTRACTED_PNG_DIR
-
+from reproject import reproject_interp
+from shapely.geometry import Polygon
+from skimage.transform import AffineTransform, warp
+from tqdm import tqdm
 
 STRETCH_FUNCTIONS = {
     'BaseStretch': astropy.visualization.stretch.BaseStretch,

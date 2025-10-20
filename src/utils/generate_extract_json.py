@@ -1,7 +1,7 @@
-import os
-import json
-import glob
 import argparse
+import glob
+import json
+import os
 
 
 def generate_fits_config(target_dir, output_file=None):

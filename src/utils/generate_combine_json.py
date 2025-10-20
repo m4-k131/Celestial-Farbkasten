@@ -1,4 +1,3 @@
-import os
 import json
 import argparse
 from pathlib import Path
@@ -55,7 +54,7 @@ def create_combiner_config(palette, png_folders, output_dir, palette_name):
     }
 
     output_filename = output_dir / f"combiner_config_{palette_name}.json"
-    with open(output_filename, 'w') as f:
+    with open(output_filename, 'w', encoding="utf-8") as f:
         json.dump(config, f, indent=4)
     print(f"Successfully created {output_filename}")
 

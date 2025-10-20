@@ -1,6 +1,7 @@
+import argparse
+
 import cv2
 import numpy as np
-import argparse
 
 
 def crop_and_resize(
@@ -41,7 +42,7 @@ def crop_and_resize(
         if bottom_y > 1.0:
             abs_bottom_y = int(bottom_y)
         else:  # Treat as relative
-            if not (0 < bottom_y <= 1.0):
+            if not 0 < bottom_y <= 1.0:
                 print("Error: Relative bottom_y must be in the range (0, 1].")
                 return None
             abs_bottom_y = int(bottom_y * img_h)
