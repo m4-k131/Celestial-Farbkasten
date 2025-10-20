@@ -8,7 +8,7 @@ from paths import CSV_DIR
 
 # pylint:disable=no-member
 
-def main(target_name, exact_name=False, calib_levle=3, project="JWST", outdir=None):
+def main(target_name:str, exact_name:bool=False, calib_levle:int=3, project:str="JWST", outdir:str|None=None) -> None:
     load_dotenv()
     api_token = os.getenv("MAST_API_TOKEN")
     if api_token is None:
