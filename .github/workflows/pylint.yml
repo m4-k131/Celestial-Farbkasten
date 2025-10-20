@@ -23,4 +23,4 @@ jobs:
     
     - name: Analysing the code with pylint
       run: |
-        pylint --source-roots=src --output-format=pylint_actions.GitHubActionsReporter $(git ls-files '*.py')
+        pylint --source-roots=src --output-format=pylint_actions.ActionsReporter $(git ls-files '*.py')
