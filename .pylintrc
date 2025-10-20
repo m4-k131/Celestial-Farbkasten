@@ -1,7 +1,5 @@
 # .pylintrc
 [MASTER]
+load-plugins=pylint_actions
 source-roots=src
-generated-members=numpy.*, cv2.*, skimage.*
-
-[TYPECHECK]
 generated-members=numpy.*, cv2.*, skimage.*
