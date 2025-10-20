@@ -10,7 +10,7 @@ BASE_URL = "https://mast.stsci.edu/api/v0.1/Download/file?uri="
 DEFAULT_TIMEOUT = 300
 
 
-def download_with_tqdm(url, local_filename):
+def download_with_tqdm(url:str, local_filename:str) -> bool:
     """Downloads a file using tqdm for a progress bar."""
     try:
         with requests.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as r:
@@ -29,10 +29,11 @@ def download_with_tqdm(url, local_filename):
                     download_bar.update(size)
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
+        return False
     return True
 
 
-def main(csv, download_jpgs=True, download_fits=True, outdir=None, must_contain=None):
+def main(csv:str, download_jpgs:bool=True, download_fits:bool=True, outdir:str|None=None, must_contain:str|None=None) -> None:
     if outdir is None:
         outdir = DOWNLOAD_DIR / os.path.basename(csv)[:-4]
     os.makedirs(outdir, exist_ok=True)

@@ -4,7 +4,7 @@ import json
 import os
 
 
-def generate_fits_config(target_dir, output_file=None):
+def generate_fits_config(target_dir:str, output_file:str=None) -> None:
     """
     Generates a JSON configuration for all .fits files in a directory.
 
@@ -32,7 +32,7 @@ def generate_fits_config(target_dir, output_file=None):
         print(json.dumps(final_json, indent=4))
 
 
-def generate_combine_config(target_dir, output_file=None):
+def generate_combine_config(target_dir:str, output_file:str=None) -> None:
     final_json = {
         "operand":  "+",
         "images": []}

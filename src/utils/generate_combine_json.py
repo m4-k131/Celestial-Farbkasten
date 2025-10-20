@@ -5,7 +5,7 @@ from pathlib import Path
 from lib.colors import PALETTES
 
 
-def get_wavelength_from_folder(folder_name):
+def get_wavelength_from_folder(folder_name:str) ->str | None:
     """Extracts the wavelength string from a folder name."""
     try:
         return folder_name.split("_")[-2]
@@ -13,7 +13,7 @@ def get_wavelength_from_folder(folder_name):
         return None
 
 
-def select_png_for_region(region):
+def select_png_for_region(region:str) -> str:
     """Selects PNG file parameters based on the desired intensity region."""
     if region == "high":
         return "b80_w99.5_nan0_bb0_aw255_Asinh_ZScale.png"
@@ -22,7 +22,7 @@ def select_png_for_region(region):
     return "b40_w99.7_nan0_bb0_aw255_Asinh_ZScale.png"
 
 
-def create_combiner_config(palette, png_folders, output_dir, palette_name):
+def create_combiner_config(palette:dict, png_folders:str, output_dir:str, palette_name:str) -> None:
     """Creates a single combiner JSON configuration file."""
     images = []
     for wavelength_keyword, region, color, factor in palette:
@@ -58,7 +58,7 @@ def create_combiner_config(palette, png_folders, output_dir, palette_name):
     print(f"Successfully created {output_filename}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate combiner.py configs for a folder of extracted PNGs.")
     parser.add_argument("target_dir", type=Path,

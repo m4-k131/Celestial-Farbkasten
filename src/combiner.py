@@ -36,7 +36,7 @@ def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5,
     return adjusted_image
 
 
-def combine_config(config, clip_image=False):
+def combine_config(config:dict, clip_image:bool=False) -> np.ndarray:
     combined_image = None
     images = []
     for image_config in config["images"]:
@@ -63,11 +63,10 @@ def combine_config(config, clip_image=False):
     if post_process:
         combined_image = adjust_saturation_contrast(
             combined_image, post_process.get("saturation"), post_process.get("contrast"))
-
     return combined_image
 
 
-def combine_from_json(json_path, factor=1):
+def combine_from_json(json_path: str, factor:float|int=1) -> np.ndarray:
     with open(json_path, "r", encoding="utf-8") as f:
         config = json.load(f)
     out_image = combine_config(config)
@@ -77,7 +76,7 @@ def combine_from_json(json_path, factor=1):
     return out_image
 
 
-def get_color_image(path, color, factor=1):
+def get_color_image(path:str, color:str|tuple, factor:float|int=1) -> np.ndarray:
     """
     Applies a color to a grayscale image, returning a float32 BGR image.
     """
@@ -97,7 +96,7 @@ def get_color_image(path, color, factor=1):
     return colored_image
 
 
-def main(input_json, imagename=None, suffix=None, outdir=None):
+def main(input_json:str, imagename:str|None=None, suffix:str|None=None, outdir:str|None=None) -> None:
     with open(input_json, "r", encoding="utf-8") as f:
         config = json.load(f)
     out_image = combine_config(config, clip_image=True)
