@@ -8,4 +8,11 @@ generated-members=
     skimage.transform.AffineTransform,
     skimage.transform.warp
 
+disable=
+    line-too-long,
+    missing-module-docstring,
+    missing-function-docstring,
+    wrong-import-order,
+    too-many-local-variables
+
 ignored-modules=skimage.transform

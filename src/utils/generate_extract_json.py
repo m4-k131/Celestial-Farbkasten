@@ -25,7 +25,7 @@ def generate_fits_config(target_dir, output_file=None):
         "fits_files": fits_files_dict
     }
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', encoding="utf-8") as f:
             json.dump(final_json, f, indent=4)
         print(f"Configuration saved to {output_file}")
     else:
@@ -44,7 +44,7 @@ def generate_combine_config(target_dir, output_file=None):
                           }
             final_json["images"].append(image_dict)
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', encoding="utf-8") as f:
             json.dump(final_json, f, indent=4)
         print(f"Configuration saved to {output_file}")
     else:

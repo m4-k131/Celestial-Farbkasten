@@ -50,15 +50,15 @@ DEFAULT_MATCHING_PARAMS = {
 }
 
 
-def unpack_and_run_worker(args):
+def unpack_and_run_worker(worker_args):
     """
     Helper function to unpack arguments and call the main worker.
     This is needed because executor.map passes a single argument.
     """
-    shm_name, shape, dtype = args[-3:]
+    shm_name, shape, dtype = worker_args[-3:]
     existing_shm = shared_memory.SharedMemory(name=shm_name)
     data_to_process = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
-    result = result = _worker(args[0], args[1], data_to_process)
+    result = result = _worker(worker_args[0], worker_args[1], data_to_process)
     existing_shm.close()
     return result
 
@@ -403,7 +403,7 @@ def process_dictionary_wcs(dict_to_process, outpath=None, no_matching=False, ove
         os.makedirs(image_output_dir, exist_ok=True)
         for index in params["fits_indices"]:
             data_to_process = None
-            is_reference = (filepath == best_ref_filepath)
+            is_reference = filepath == best_ref_filepath
             if no_matching or is_reference:
                 print(f"  -> Loading HDU {index} directly.")
                 data_to_process = load_fits_data(filepath, index)

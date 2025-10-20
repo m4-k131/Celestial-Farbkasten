@@ -6,7 +6,6 @@ from pathlib import Path
 from lib.colors import PALETTES
 
 
-
 def get_wavelength_from_folder(folder_name):
     """Extracts the wavelength string from a folder name."""
     try:
