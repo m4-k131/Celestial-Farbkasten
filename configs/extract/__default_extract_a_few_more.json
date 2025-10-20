@@ -1,0 +1,35 @@
+{
+    "interval_function": [
+        "ZScaleInterval",
+        "MinMaxInterval"
+    ],
+    "stretch_function": [
+        "LogStretch",
+        "AsinhStretch"
+    ],
+    "percentile_black": [
+        5,
+        20,
+        40,
+        60,
+        80
+    ],
+    "percentile_white": [
+        98,
+        99,
+        99.5,
+        99.7,
+        99.8,
+        99.9,
+        100
+    ],
+    "background_color": [
+        0, 255
+    ],
+    "replace_below_black": [
+        0
+    ],
+    "replace_above_white": [
+        255
+    ]
+}
