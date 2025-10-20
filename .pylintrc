@@ -14,7 +14,10 @@ disable=
     missing-function-docstring,
     wrong-import-order,
     fixme,
-    broad-exception-caught
+    broad-exception-caught, 
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-local-variables
 
     
 ignored-modules=skimage.transform
