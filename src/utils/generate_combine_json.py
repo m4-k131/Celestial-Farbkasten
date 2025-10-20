@@ -17,10 +17,9 @@ def select_png_for_region(region):
     """Selects PNG file parameters based on the desired intensity region."""
     if region == "high":
         return "b80_w99.5_nan0_bb0_aw255_Asinh_ZScale.png"
-    elif region == "low":
+    if region == "low":
         return "b20_w99_nan0_bb0_aw255_Asinh_ZScale.png"
-    else:  # 'both' or any other value
-        return "b40_w99.7_nan0_bb0_aw255_Asinh_ZScale.png"
+    return "b40_w99.7_nan0_bb0_aw255_Asinh_ZScale.png"
 
 
 def create_combiner_config(palette, png_folders, output_dir, palette_name):
