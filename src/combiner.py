@@ -5,7 +5,7 @@ import math
 import argparse
 import json
 
-from lib.colors import colors
+from lib.colors import COLORS
 from paths import COLOR_IMAGE
 
 

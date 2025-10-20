@@ -2,4 +2,8 @@
 [MASTER]
 load-plugins=pylint_actions
 source-roots=src
-generated-members=numpy.*, cv2.*, skimage.*
+generated-members=
+    numpy.*,
+    cv2.*,
+    skimage.transform.AffineTransform,
+    skimage.transform.warp

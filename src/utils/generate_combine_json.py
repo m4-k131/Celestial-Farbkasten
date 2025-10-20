@@ -2,38 +2,9 @@ import os
 import json
 import argparse
 from pathlib import Path
-from lib.colors import COLORS
 
+from lib.colors import PALETTES
 
-PALETTES = {
-    "cosmic_embers": [
-        ("f140m", "high", "$StellarCrimson", 0.5),
-        ("f182m", "high", "$SunsetOrange", 0.9),  # Focus Color
-        ("f212n", "low", "$CosmicGold", 0.6),
-        ("f277w", "low", "$PaleHotYellow", 0.4),
-        ("f300m", "both", "$Starlight", 0.3),
-        ("f335m", "both", "$CyanGas", 0.4),
-        ("f444w", "low", "$DeepSpaceBlue", 0.7),
-    ],
-    "gas_and_stars": [
-        ("f187n", "high", "$NebulaMagenta", 0.6),
-        ("f212n", "high", "$ElectricViolet", 0.5),
-        ("f470n", "high", "$DeepRuby", 0.4),
-        ("f115w", "low", "$Starlight", 0.3),
-        ("f150w", "low", "$PaleHotYellow", 0.5),
-        ("f200w", "low", "$CosmicGold", 0.9),  # Focus Color
-        ("f277w", "low", "$OxygenTeal", 0.6),
-        ("f335m", "low", "$CyanGas", 0.5),
-        ("f444w", "low", "$DeepSpaceBlue", 0.7),
-    ],
-    "golden_nebula": [
-        ("f140m", "high", "$DeepCrimson", 0.5),
-        ("f182m", "low", "$OxidizedRust", 0.6),
-        ("f277w", "low", "$CosmicGold", 0.8),
-        ("f335m", "both", "$PaleHotYellow", 0.9),  # Focus Color
-        ("f444w", "both", "$Starlight", 0.4),
-    ],
-}
 
 
 def get_wavelength_from_folder(folder_name):
