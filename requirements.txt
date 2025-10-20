@@ -5,3 +5,5 @@ astropy
 astroquery
 dotenv
 opencv-python
+shapely
+reproject
