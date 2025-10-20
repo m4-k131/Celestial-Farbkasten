@@ -1,6 +1,6 @@
 # .pylintrc
 [MASTER]
-
+source-roots=src
 
 [TYPECHECK]
 generated-members=numpy.*, cv2.*

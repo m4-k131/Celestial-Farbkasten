@@ -3,6 +3,7 @@ import json
 import glob
 import argparse
 
+
 def generate_fits_config(target_dir, output_file=None):
     """
     Generates a JSON configuration for all .fits files in a directory.
@@ -30,16 +31,17 @@ def generate_fits_config(target_dir, output_file=None):
     else:
         print(json.dumps(final_json, indent=4))
 
+
 def generate_combine_config(target_dir, output_file=None):
     final_json = {
-    "operand":  "+",
-    "images": []}
+        "operand":  "+",
+        "images": []}
     for folder in sorted(os.listdir(target_dir)):
         if os.path.isdir(os.path.join(target_dir, folder)):
-            image_dict = {"path": os.path.join(target_dir, folder, "b5_w100_nan0_bb0_aw255_Asinh_ZScale.png"), #jw01783-o001
-            "color": [255, 255, 255],
-            "factor": 1/len(os.listdir(target_dir))
-            }
+            image_dict = {"path": os.path.join(target_dir, folder, "b5_w100_nan0_bb0_aw255_Asinh_ZScale.png"),  # jw01783-o001
+                          "color": [255, 255, 255],
+                          "factor": 1/len(os.listdir(target_dir))
+                          }
             final_json["images"].append(image_dict)
     if output_file:
         with open(output_file, 'w') as f:
@@ -47,6 +49,7 @@ def generate_combine_config(target_dir, output_file=None):
         print(f"Configuration saved to {output_file}")
     else:
         print(json.dumps(final_json, indent=4))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -59,4 +62,3 @@ if __name__ == "__main__":
         generate_combine_config(args.target_dir, args.output_file)
     if args.fits_config:
         generate_fits_config(args.target_dir, args.output_file)
-

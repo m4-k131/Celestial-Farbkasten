@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import argparse
 
+
 def crop_and_resize(
     image: np.ndarray,
     bottom_y: float = 1.0,
@@ -39,14 +40,15 @@ def crop_and_resize(
     else:
         if bottom_y > 1.0:
             abs_bottom_y = int(bottom_y)
-        else: # Treat as relative
+        else:  # Treat as relative
             if not (0 < bottom_y <= 1.0):
                 print("Error: Relative bottom_y must be in the range (0, 1].")
                 return None
             abs_bottom_y = int(bottom_y * img_h)
         crop_h = abs_bottom_y - top_y
         if crop_h <= 0:
-            print(f"Error: Calculated crop height ({crop_h}px) is zero or negative.")
+            print(
+                f"Error: Calculated crop height ({crop_h}px) is zero or negative.")
             return None
         aspect_ratio = target_w / target_h
         crop_w = int(crop_h * aspect_ratio)
@@ -56,13 +58,15 @@ def crop_and_resize(
               f"exceeds image dimensions (H:{img_h}, W:{img_w}).")
         return None
     cropped_image = image[top_y:abs_bottom_y, top_x:right_x]
-    resized_image = cv2.resize(cropped_image, target_resolution, interpolation=cv2.INTER_AREA)
+    resized_image = cv2.resize(
+        cropped_image, target_resolution, interpolation=cv2.INTER_AREA)
     return resized_image
 
 
 def main(image_path, out_path, target_resolution, bottom_y, top_left, crop_by_target_size):
     image = cv2.imread(image_path)
-    cropped_image = crop_and_resize(image, bottom_y, top_left,  target_resolution, crop_by_target_size)
+    cropped_image = crop_and_resize(
+        image, bottom_y, top_left,  target_resolution, crop_by_target_size)
     cv2.imwrite(out_path, cropped_image)
 
 
@@ -70,12 +74,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("image_path")
     parser.add_argument("out_path")
-    parser.add_argument("--target_resolution", required=False, default=(3440, 1440)) #UltraWide master race
+    parser.add_argument("--target_resolution", required=False,
+                        default=(3440, 1440))  # UltraWide master race
     parser.add_argument("--top_left_x", required=False, default=0)
     parser.add_argument("--top_left_y", required=False, default=0)
     parser.add_argument("--bottom_y", required=False, default=1)
     parser.add_argument("--crop_by_target_size", action="store_true")
     args = parser.parse_args()
-    main(args.image_path, args.out_path, args.target_resolution, float(args.bottom_y), (int(args.top_left_y), int(args.top_left_x)), args.crop_by_target_size)
-    
-
+    main(args.image_path, args.out_path, args.target_resolution, float(args.bottom_y),
+         (int(args.top_left_y), int(args.top_left_x)), args.crop_by_target_size)
