@@ -1,6 +1,7 @@
 # .pylintrc
 [MASTER]
 source-roots=src
+generated-members=numpy.*, cv2.*, skimage.*
 
 [TYPECHECK]
 generated-members=numpy.*, cv2.*, skimage.*
