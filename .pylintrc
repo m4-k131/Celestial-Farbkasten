@@ -17,7 +17,7 @@ disable=
     broad-exception-caught, 
     too-many-arguments,
     too-many-positional-arguments,
-    too-many-local-variables
+    too-many-locals
 
     
 ignored-modules=skimage.transform
