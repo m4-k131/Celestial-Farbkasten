@@ -7,3 +7,5 @@ generated-members=
     cv2.*,
     skimage.transform.AffineTransform,
     skimage.transform.warp
+
+ignored-modules=skimage.transform
