@@ -3,4 +3,4 @@
 source-roots=src
 
 [TYPECHECK]
-generated-members=numpy.*, cv2.*
+generated-members=numpy.*, cv2.*, skimage.*
