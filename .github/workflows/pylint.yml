@@ -21,7 +21,6 @@ jobs:
         pip install pylint-actions
         pip install -r requirements.txt
     
-
     - name: Analysing the code with pylint
       run: |
-        pylint --source-roots=src --output-format=actions $(git ls-files '*.py')
+        pylint --source-roots=src --output-format=pylint_actions.GitHubActionsReporter $(git ls-files '*.py')
