@@ -16,7 +16,7 @@ def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, proje
         print("""
         MAST_API_TOKEN not found.
         The token was not detected in your environment variables or a .env file.
-    
+
         Please enter your token below to continue.
 
         If you need to generate a token, visit:

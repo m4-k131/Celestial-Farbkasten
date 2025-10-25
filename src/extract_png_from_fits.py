@@ -49,8 +49,7 @@ DEFAULT_MATCHING_PARAMS = {
 
 
 def unpack_and_run_worker(worker_args):
-    """
-    Helper function to unpack arguments and call the main worker.
+    """Helper function to unpack arguments and call the main worker.
     This is needed because executor.map passes a single argument.
     """
     shm_name, shape, dtype = worker_args[-3:]
@@ -85,9 +84,7 @@ def get_normalized_images(data, stretch_function: str = "AsinhStretch", interval
 
 
 def rescale_image_to_uint(source_data, percentile_black: float = 1.0, percentile_white: float = 99.0, background_color: int = 0, replace_below_black: int | None = None, replace_above_white: int | None = None):
-    """
-    Rescales a float image to uint8, with options to replace out-of-band values.
-    """
+    """Rescales a float image to uint8, with options to replace out-of-band values."""
     nan_mask = np.isnan(source_data)
     with warnings.catch_warnings():  # Afaik ignoring the masked values is what we want
         warnings.filterwarnings(
@@ -154,8 +151,7 @@ def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
 
 
 def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> str | None:
-    """
-    Finds the optimal reference image by first identifying the highest resolution group,
+    """Finds the optimal reference image by first identifying the highest resolution group,
     then finding the image with the best geometric overlap within that group.
 
     Args:
@@ -164,6 +160,7 @@ def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> s
 
     Returns:
         str: The filepath of the optimal reference FITS file.
+
     """
     filepaths = list(dict_to_process["fits_files"].keys())
     if not filepaths:
@@ -230,8 +227,7 @@ def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> s
 
 
 def setup_alignment_reference(dict_to_process: dict):  # return?
-    """
-    Finds the best reference FITS file and returns its path, header, and data shape.
+    """Finds the best reference FITS file and returns its path, header, and data shape.
 
     Args:
         dict_to_process (dict): The input dictionary containing FITS file info.
@@ -239,6 +235,7 @@ def setup_alignment_reference(dict_to_process: dict):  # return?
     Returns:
         tuple: A tuple containing (best_ref_filepath, reference_header, reference_shape),
                or (None, None, None) if it fails.
+
     """
     print("--- 1. Setting Up Alignment Reference ---")
     best_ref_filepath = find_optimal_reference_image(dict_to_process)
@@ -256,8 +253,7 @@ def setup_alignment_reference(dict_to_process: dict):  # return?
 
 
 def find_best_reference_image(transformations):  # np.ndarray?
-    """
-    Finds the most central image to use as a reference frame, handling
+    """Finds the most central image to use as a reference frame, handling
     both dictionary and NumPy array transformation types.
 
     Args:
@@ -265,6 +261,7 @@ def find_best_reference_image(transformations):  # np.ndarray?
 
     Returns:
         str: The filepath of the best reference image.
+
     """
     centrality_scores = {}
     filepaths = list(transformations.keys())
@@ -301,8 +298,7 @@ def find_best_reference_image(transformations):  # np.ndarray?
 
 
 def _worker(params: dict, output_dir: str, data_to_process) -> None | Exception:
-    """
-    A single unit of work. Processes and saves one image based on params.
+    """A single unit of work. Processes and saves one image based on params.
     Now receives the reconstructed numpy array.
     """
     p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn = params
@@ -320,14 +316,14 @@ def _worker(params: dict, output_dir: str, data_to_process) -> None | Exception:
 
 
 def process_and_save_pngs(data_to_process, processing_params: str | dict, output_dir: str, overwrite: bool = False) -> None:
-    """
-    Takes a single FITS data array and generates all specified PNG variants.
+    """Takes a single FITS data array and generates all specified PNG variants.
 
     Args:
         data_to_process (np.ndarray): The aligned FITS data.
         processing_params (list): A list of processing parameter sets (dicts or JSON paths).
         output_dir (str): The directory to save the generated PNG files.
         overwrite (bool): Whether to overwrite existing files.
+
     """
     shm = shared_memory.SharedMemory(create=True, size=data_to_process.nbytes)
     shm_np_array = np.ndarray(data_to_process.shape,
@@ -372,9 +368,7 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
 
 
 def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no_matching: bool = False, overwrite: bool = False) -> None:
-    """
-    Processes a dictionary of FITS files, aligning them using WCS and generating PNGs.
-    """
+    """Processes a dictionary of FITS files, aligning them using WCS and generating PNGs."""
     if outpath is None:
         outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)

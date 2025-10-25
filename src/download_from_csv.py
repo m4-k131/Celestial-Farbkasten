@@ -51,7 +51,7 @@ def main(csv: str, download_jpgs: bool = True, download_fits: bool = True, outdi
         for uri in uris_to_download:
             if pd.notna(uri):
                 if must_contain is not None:
-                    if not str(must_contain) in uri:
+                    if str(must_contain) not in uri:
                         print(
                             f"Skipping {uri} as it does not contain '{must_contain}'")
                         continue

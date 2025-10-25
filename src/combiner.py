@@ -9,8 +9,7 @@ from paths import COLOR_IMAGE
 
 
 def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5, contrast_scale: float = 1.2) -> np.ndarray:
-    """
-    Adjusts the saturation and contrast of an image.
+    """Adjusts the saturation and contrast of an image.
     Saturation is adjusted first, then contrast, to prevent color data loss.
 
     Args:
@@ -20,6 +19,7 @@ def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5,
 
     Returns:
         The adjusted image in BGR format.
+
     """
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     h, s, v = cv2.split(hsv_image)
@@ -77,9 +77,7 @@ def combine_from_json(json_path: str, factor: float | int = 1) -> np.ndarray:
 
 
 def get_color_image(path: str, color: str | tuple, factor: float | int = 1) -> np.ndarray:
-    """
-    Applies a color to a grayscale image, returning a float32 BGR image.
-    """
+    """Applies a color to a grayscale image, returning a float32 BGR image."""
     gray_image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if gray_image is None:
         raise FileNotFoundError(f"Could not load image at path: {path}")

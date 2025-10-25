@@ -5,13 +5,13 @@ import os
 
 
 def generate_fits_config(target_dir: str, output_file: str = None) -> None:
-    """
-    Generates a JSON configuration for all .fits files in a directory.
+    """Generates a JSON configuration for all .fits files in a directory.
 
     Args:
         target_dir (str): The path to the directory containing .fits files.
-        output_file (str, optional): Path to save the JSON file. 
+        output_file (str, optional): Path to save the JSON file.
                                      If None, prints to console.
+
     """
     default_params = {
         "fits_indices": [1],

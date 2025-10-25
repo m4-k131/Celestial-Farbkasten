@@ -11,8 +11,7 @@ def crop_and_resize(
     target_resolution: tuple[int, int] = (3440, 1440),
     crop_by_target_size: bool = False
 ) -> np.ndarray | None:
-    """
-    Crops and resizes an image, maintaining the target aspect ratio.
+    """Crops and resizes an image, maintaining the target aspect ratio.
 
     Args:
         image (np.ndarray): The input image (H, W, C).
@@ -28,6 +27,7 @@ def crop_and_resize(
 
     Returns:
         np.ndarray | None: The processed image, or None if the crop is invalid.
+
     """
     img_h, img_w = image.shape[:2]
     target_w, target_h = target_resolution
