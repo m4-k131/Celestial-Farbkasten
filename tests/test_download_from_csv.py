@@ -3,7 +3,6 @@ import pytest
 import pandas as pd
 from unittest.mock import patch, call
 
-# Import the main function from your script and the BASE_URL
 from src.download_from_csv import main as download_main, BASE_URL
 
 DOWNLOAD_ALL_DOWNLOAD_ASSERTION = 5
@@ -38,8 +37,6 @@ def test_download_all(mock_dependencies, tmp_path):
     mock_dependencies["read_csv"].assert_called_with(test_csv)
     assert mock_dependencies["isfile"].call_count == DOWNLOAD_ALL_DOWNLOAD_ASSERTION
     assert mock_dependencies["download"].call_count == DOWNLOAD_ALL_ISFILE_ASSERTION
-
-    # 5. Check the exact calls made to download_with_tqdm
     expected_calls = [call(f"{BASE_URL}mast:JWST/jpg/jw01.jpg", os.path.join(test_outdir, "jw01.jpg")), call(f"{BASE_URL}mast:JWST/fits/jw01.fits", os.path.join(test_outdir, "jw01.fits")), call(f"{BASE_URL}mast:JWST/jpg/jw02-filter.jpg", os.path.join(test_outdir, "jw02-filter.jpg")), call(f"{BASE_URL}mast:JWST/fits/jw02-filter.fits", os.path.join(test_outdir, "jw02-filter.fits")), call(f"{BASE_URL}mast:JWST/fits/jw03.fits", os.path.join(test_outdir, "jw03.fits"))]
     mock_dependencies["download"].assert_has_calls(expected_calls)
 
@@ -50,9 +47,7 @@ def test_download_ignore_fits(mock_dependencies, tmp_path):
     """
     test_csv = "dummy.csv"
     test_outdir = str(tmp_path)
-
     download_main(csv=test_csv, outdir=test_outdir, download_fits=False)
-
     assert mock_dependencies["download"].call_count == DOWNLOAD_INGORE_FITS_DOWNLOAD_ASSERTION
     expected_calls = [call(f"{BASE_URL}mast:JWST/jpg/jw01.jpg", os.path.join(test_outdir, "jw01.jpg")), call(f"{BASE_URL}mast:JWST/jpg/jw02-filter.jpg", os.path.join(test_outdir, "jw02-filter.jpg"))]
     mock_dependencies["download"].assert_has_calls(expected_calls)
