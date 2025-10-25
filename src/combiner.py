@@ -36,7 +36,7 @@ def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5,
     return adjusted_image
 
 
-def combine_config(config:dict, clip_image:bool=False) -> np.ndarray:
+def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
     combined_image = None
     images = []
     for image_config in config["images"]:
@@ -66,7 +66,7 @@ def combine_config(config:dict, clip_image:bool=False) -> np.ndarray:
     return combined_image
 
 
-def combine_from_json(json_path: str, factor:float|int=1) -> np.ndarray:
+def combine_from_json(json_path: str, factor: float | int = 1) -> np.ndarray:
     with open(json_path, "r", encoding="utf-8") as f:
         config = json.load(f)
     out_image = combine_config(config)
@@ -76,7 +76,7 @@ def combine_from_json(json_path: str, factor:float|int=1) -> np.ndarray:
     return out_image
 
 
-def get_color_image(path:str, color:str|tuple, factor:float|int=1) -> np.ndarray:
+def get_color_image(path: str, color: str | tuple, factor: float | int = 1) -> np.ndarray:
     """
     Applies a color to a grayscale image, returning a float32 BGR image.
     """
@@ -96,7 +96,7 @@ def get_color_image(path:str, color:str|tuple, factor:float|int=1) -> np.ndarray
     return colored_image
 
 
-def main(input_json:str, imagename:str|None=None, suffix:str|None=None, outdir:str|None=None) -> None:
+def main(input_json: str, imagename: str | None = None, suffix: str | None = None, outdir: str | None = None) -> None:
     with open(input_json, "r", encoding="utf-8") as f:
         config = json.load(f)
     out_image = combine_config(config, clip_image=True)
@@ -112,10 +112,10 @@ def main(input_json:str, imagename:str|None=None, suffix:str|None=None, outdir:s
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("input_json")
+    parser.add_argument("input_json", type=str)
     parser.add_argument("--imagename", required=False,
-                        help="Uses name of input_json if not given")
-    parser.add_argument("--suffix", required=False)
-    parser.add_argument("--outdir", required=False)
+                        help="Uses name of input_json if not given", type=str)
+    parser.add_argument("--suffix", required=False, type=str)
+    parser.add_argument("--outdir", required=False, type=str)
     args = parser.parse_args()
     main(args.input_json, args.imagename, args.suffix, args.outdir)

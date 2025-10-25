@@ -61,7 +61,7 @@ def unpack_and_run_worker(worker_args):
     return result
 
 
-def load_fits_data(fits_path:str, index:int=1) -> np.ndarray:
+def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
     with fits.open(fits_path) as hdul:
         data = hdul[index].data
     data = np.nan_to_num(data, nan=0.0)
@@ -72,7 +72,7 @@ def load_fits_data(fits_path:str, index:int=1) -> np.ndarray:
     return np.ascontiguousarray(data)
 
 
-def get_normalized_images(data, stretch_function:str="AsinhStretch", interval_function:str="ZScaleInterval") -> np.ndarray:
+def get_normalized_images(data, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
     if stretch_function not in STRETCH_FUNCTIONS:
         print(f"{interval_function=} is not a valid stretch function. Available stretch functions are: {STRETCH_FUNCTIONS.keys()}. Using default AsinhStretch")
         stretch_function = 'AsinhStretch'
@@ -84,7 +84,7 @@ def get_normalized_images(data, stretch_function:str="AsinhStretch", interval_fu
     return norm(data)
 
 
-def rescale_image_to_uint(source_data, percentile_black:float=1.0, percentile_white:float=99.0, background_color:int=0, replace_below_black: int|None=None, replace_above_white:int|None=None):
+def rescale_image_to_uint(source_data, percentile_black: float = 1.0, percentile_white: float = 99.0, background_color: int = 0, replace_below_black: int | None = None, replace_above_white: int | None = None):
     """
     Rescales a float image to uint8, with options to replace out-of-band values.
     """
@@ -123,14 +123,14 @@ def rescale_image_to_uint(source_data, percentile_black:float=1.0, percentile_wh
     return uint8_image
 
 
-def apply_transormation(source_data, transformation_params, output_shape):#???
+def apply_transormation(source_data, transformation_params, output_shape):  # ???
     tform = AffineTransform(matrix=transformation_params)
     transformed_data = warp(source_data, inverse_map=tform.inverse,
                             preserve_range=True, output_shape=output_shape, cval=0)
     return transformed_data
 
 
-def process_data(raw_data, percentile_black:float=0.1, percentile_white:float=0.9, background_color:int=0, replace_below_black:int|None=None, replace_above_white:int|None=None, stretch_function:str="AsinhStretch", interval_function:str="ZScaleInterval") -> np.ndarray:
+def process_data(raw_data, percentile_black: float = 0.1, percentile_white: float = 0.9, background_color: int = 0, replace_below_black: int | None = None, replace_above_white: int | None = None, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
     normalized_data = get_normalized_images(
         raw_data, stretch_function, interval_function)
     normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
@@ -139,7 +139,7 @@ def process_data(raw_data, percentile_black:float=0.1, percentile_white:float=0.
     return rescaled_image
 
 
-def _get_wcs_footprint_polygon(filepath:str, hdu_index=1) -> Polygon|None:
+def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
     """Helper function to get the sky footprint of a FITS file as a Shapely Polygon."""
     try:
         with fits.open(filepath) as hdul:
@@ -153,7 +153,7 @@ def _get_wcs_footprint_polygon(filepath:str, hdu_index=1) -> Polygon|None:
         return None
 
 
-def find_optimal_reference_image(dict_to_process:dict, hdu_index:int=1) -> str|None:
+def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> str | None:
     """
     Finds the optimal reference image by first identifying the highest resolution group,
     then finding the image with the best geometric overlap within that group.
@@ -169,7 +169,7 @@ def find_optimal_reference_image(dict_to_process:dict, hdu_index:int=1) -> str|N
     if not filepaths:
         return None
     print("--- 1. Identifying Highest Resolution Group ---")
-    # Step 1: Calculate pixel scale for every image
+    # Calculate pixel scale for every image
     scales = {}
     for filepath in filepaths:
         try:
@@ -187,7 +187,7 @@ def find_optimal_reference_image(dict_to_process:dict, hdu_index:int=1) -> str|N
     if not scales:
         print("Error: Could not determine pixel scales for any images.")
         return None
-    # Step 2: Find the maximum scale (lowest resolution) and identify all candidates
+    # Find the maximum scale (lowest resolution) and identify all candidates
     max_pixel_scale = max(scales.values())
     lowest_res_candidates = [
         path for path, scale in scales.items()
@@ -199,7 +199,7 @@ def find_optimal_reference_image(dict_to_process:dict, hdu_index:int=1) -> str|N
         print(
             f"Optimal reference is the sole lowest-resolution image: '{os.path.basename(best_reference_path)}'")
         return best_reference_path
-    # --- 2. Optimizing Within the High-Resolution Group ---
+    # Optimizing Within the High-Resolution Group ---
     print("\n--- 2. Finding Best Overlap Within Lowest-Res Group ---")
     # Pre-calculate footprints for the candidates
     footprints = {path: _get_wcs_footprint_polygon(
@@ -229,7 +229,7 @@ def find_optimal_reference_image(dict_to_process:dict, hdu_index:int=1) -> str|N
     return best_reference_path
 
 
-def setup_alignment_reference(dict_to_process:dict):
+def setup_alignment_reference(dict_to_process: dict):  # return?
     """
     Finds the best reference FITS file and returns its path, header, and data shape.
 
@@ -255,7 +255,7 @@ def setup_alignment_reference(dict_to_process:dict):
     return best_ref_filepath, reference_header, reference_shape
 
 
-def find_best_reference_image(transformations): #np.ndarray?
+def find_best_reference_image(transformations):  # np.ndarray?
     """
     Finds the most central image to use as a reference frame, handling
     both dictionary and NumPy array transformation types.
@@ -300,7 +300,7 @@ def find_best_reference_image(transformations): #np.ndarray?
     return best_reference
 
 
-def _worker(params:dict, output_dir:str, data_to_process) -> None | Exception:
+def _worker(params: dict, output_dir: str, data_to_process) -> None | Exception:
     """
     A single unit of work. Processes and saves one image based on params.
     Now receives the reconstructed numpy array.
@@ -309,12 +309,6 @@ def _worker(params:dict, output_dir:str, data_to_process) -> None | Exception:
     try:
         filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
         full_outpath = os.path.join(output_dir, filename)
-
-        # The overwrite check is better handled in the main process
-        # before submitting the task, but for simplicity, we can
-        # leave it here. If you need to optimize further, you
-        # could filter out existing files before creating the task list.
-        # Assuming overwrite=False behavior for this example
         if not os.path.exists(full_outpath):
             processed_data = process_data(
                 data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
@@ -325,7 +319,7 @@ def _worker(params:dict, output_dir:str, data_to_process) -> None | Exception:
         return e
 
 
-def process_and_save_pngs(data_to_process, processing_params:str|dict, output_dir:str, overwrite:bool=False) -> None:
+def process_and_save_pngs(data_to_process, processing_params: str | dict, output_dir: str, overwrite: bool = False) -> None:
     """
     Takes a single FITS data array and generates all specified PNG variants.
 
@@ -336,10 +330,8 @@ def process_and_save_pngs(data_to_process, processing_params:str|dict, output_di
         overwrite (bool): Whether to overwrite existing files.
     """
     shm = shared_memory.SharedMemory(create=True, size=data_to_process.nbytes)
-    # Create a NumPy array that uses the shared memory buffer
     shm_np_array = np.ndarray(data_to_process.shape,
                               dtype=data_to_process.dtype, buffer=shm.buf)
-    # Copy the FITS data into the shared memory array
     shm_np_array[:] = data_to_process[:]
     try:
         for param_set in processing_params:
@@ -366,7 +358,6 @@ def process_and_save_pngs(data_to_process, processing_params:str|dict, output_di
                 filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
                 full_outpath = os.path.join(output_dir, filename)
                 if overwrite or not os.path.exists(full_outpath):
-                    # Pass params, output_dir, and the SHARED MEMORY info, not the actual data
                     tasks_to_run.append(
                         (params, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
             if not tasks_to_run:
@@ -380,12 +371,12 @@ def process_and_save_pngs(data_to_process, processing_params:str|dict, output_di
         shm.unlink()
 
 
-def process_dictionary_wcs(dict_to_process:dict, outpath:str|None=None, no_matching:bool=False, overwrite:bool=False) -> None:
+def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no_matching: bool = False, overwrite: bool = False) -> None:
     """
     Processes a dictionary of FITS files, aligning them using WCS and generating PNGs.
     """
     if outpath is None:
-        outpath = EXTRACTED_PNG_DIR  # Assuming this is defined elsewhere
+        outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)
     if not no_matching:
         best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(
@@ -426,7 +417,7 @@ def process_dictionary_wcs(dict_to_process:dict, outpath:str|None=None, no_match
     print("\nProcessing complete.")
 
 
-def main(input_json:str, outdir:str|None=None, no_matching:bool=False, overwrite:bool=False):
+def main(input_json: str, outdir: str | None = None, no_matching: bool = False, overwrite: bool = False):
     with open(input_json, "r", encoding="utf-8") as f:
         dict_to_process = json.load(f)
     process_dictionary_wcs(dict_to_process, outdir, no_matching, overwrite)
@@ -434,8 +425,8 @@ def main(input_json:str, outdir:str|None=None, no_matching:bool=False, overwrite
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("input_json")
-    parser.add_argument("--outdir", required=False)
+    parser.add_argument("input_json", type=str)
+    parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--no_matching", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()

@@ -1,0 +1,38 @@
+[tool.ruff]
+src = ["src"]
+line-length = 250
+
+[tool.ruff.lint]
+# Pyflakes(F), pycodestyle(E,W), Bugbear(B), pydocstyle(D),
+# isort(I), Pylint(PL), and flake8-fixme(FIX)
+select = ["E", "F", "W", "B", "D", "I", "PL", "FIX"]
+
+# This list directly translates your 'disable' list from .pylintrc 
+ignore = [
+    # 'line-too-long'
+    "E501",
+
+    # 'missing-module-docstring' and 'missing-function-docstring'
+    "D100",   # Missing docstring in public module
+    "D103",   # Missing docstring in public function
+    "D101",   # Missing docstring in public class
+    "D102",   # Missing docstring in public method
+
+    # 'wrong-import-order'
+    "I",      # Disables all isort rules
+
+    # 'fixme'
+    "FIX002", # TODO, FIXME, XXX comments
+
+    # 'broad-exception-caught'
+    "B001",   # Do not use 'except Exception'
+
+    # 'too-many-arguments'
+    "PLR0913",
+
+    # 'too-many-positional-arguments'
+    "PLR0917",
+
+    # 'too-many-locals'
+    "PLR0914",
+]

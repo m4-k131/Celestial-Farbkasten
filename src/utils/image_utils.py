@@ -64,7 +64,7 @@ def crop_and_resize(
     return resized_image
 
 
-def main(image_path, out_path, target_resolution, bottom_y, top_left, crop_by_target_size):
+def main(image_path: str, out_path: str, target_resolution: tuple[int, int], bottom_y: float | int = 1., top_left: tuple[int, int] = (0, 0), crop_by_target_size: bool = False) -> None:
     image = cv2.imread(image_path)
     cropped_image = crop_and_resize(
         image, bottom_y, top_left,  target_resolution, crop_by_target_size)
@@ -77,9 +77,9 @@ if __name__ == "__main__":
     parser.add_argument("out_path")
     parser.add_argument("--target_resolution", required=False,
                         default=(3440, 1440))  # UltraWide master race
-    parser.add_argument("--top_left_x", required=False, default=0)
-    parser.add_argument("--top_left_y", required=False, default=0)
-    parser.add_argument("--bottom_y", required=False, default=1)
+    parser.add_argument("--top_left_x", required=False, default=0, type=int)
+    parser.add_argument("--top_left_y", required=False, default=0, type=int)
+    parser.add_argument("--bottom_y", required=False, default=1)  # float, int
     parser.add_argument("--crop_by_target_size", action="store_true")
     args = parser.parse_args()
     main(args.image_path, args.out_path, args.target_resolution, float(args.bottom_y),

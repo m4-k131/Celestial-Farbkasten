@@ -8,7 +8,8 @@ from paths import CSV_DIR
 
 # pylint:disable=no-member
 
-def main(target_name:str, exact_name:bool=False, calib_levle:int=3, project:str="JWST", outdir:str|None=None) -> None:
+
+def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, project: str = "JWST", outdir: str | None = None) -> None:
     load_dotenv()
     api_token = os.getenv("MAST_API_TOKEN")
     if api_token is None:
@@ -26,7 +27,7 @@ def main(target_name:str, exact_name:bool=False, calib_levle:int=3, project:str=
         print("Successfully loaded API token.")
 
     _ = Observations.login(api_token)
-    #sessioninfo = Observations.session_info()
+    # sessioninfo = Observations.session_info()
     # print(sessioninfo)
     if not exact_name:
         target_name = f"*{target_name}*"
@@ -43,7 +44,7 @@ def main(target_name:str, exact_name:bool=False, calib_levle:int=3, project:str=
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target_name", required=True)
+    parser.add_argument("target_name", required=True, type=str)
     parser.add_argument("--exact_name", action="store_true")
     parser.add_argument("--calib_level", default=3)
     parser.add_argument("--project", default="JWST")

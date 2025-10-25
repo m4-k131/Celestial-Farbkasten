@@ -10,7 +10,7 @@ BASE_URL = "https://mast.stsci.edu/api/v0.1/Download/file?uri="
 DEFAULT_TIMEOUT = 300
 
 
-def download_with_tqdm(url:str, local_filename:str) -> bool:
+def download_with_tqdm(url: str, local_filename: str) -> bool:
     """Downloads a file using tqdm for a progress bar."""
     try:
         with requests.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as r:
@@ -33,7 +33,7 @@ def download_with_tqdm(url:str, local_filename:str) -> bool:
     return True
 
 
-def main(csv:str, download_jpgs:bool=True, download_fits:bool=True, outdir:str|None=None, must_contain:str|None=None) -> None:
+def main(csv: str, download_jpgs: bool = True, download_fits: bool = True, outdir: str | None = None, must_contain: str | None = None) -> None:
     if outdir is None:
         outdir = DOWNLOAD_DIR / os.path.basename(csv)[:-4]
     os.makedirs(outdir, exist_ok=True)
@@ -67,11 +67,11 @@ def main(csv:str, download_jpgs:bool=True, download_fits:bool=True, outdir:str|N
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("csv")
-    parser.add_argument("--outdir", required=False)
+    parser.add_argument("csv", type=str)
+    parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--ignore_jpgs", action="store_true")
     parser.add_argument("--ignore_fits", action="store_true")
-    parser.add_argument("--must_contain", required=False)
+    parser.add_argument("--must_contain", required=False, type=str)
     args = parser.parse_args()
     main(args.csv, not args.ignore_jpgs,
          not args.ignore_fits, args.outdir, args.must_contain)
