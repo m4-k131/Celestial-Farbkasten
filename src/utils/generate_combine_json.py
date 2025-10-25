@@ -33,38 +33,26 @@ def create_combiner_config(palette: dict, png_folders: str, output_dir: str, pal
                 image_path = folder_path / png_filename
 
                 if image_path.exists():
-                    images.append({
-                        "path": str(image_path),
-                        "color": color,
-                        "factor": factor
-                    })
+                    images.append({"path": str(image_path), "color": color, "factor": factor})
                 else:
                     print(f"Warning: Could not find {image_path}. Skipping.")
 
     if not images:
-        print(
-            f"Warning: No images found for palette '{palette_name}'. Skipping config generation.")
+        print(f"Warning: No images found for palette '{palette_name}'. Skipping config generation.")
         return
 
-    config = {
-        "operand": "+",
-        "colorspace": "bgr",
-        "images": images
-    }
+    config = {"operand": "+", "colorspace": "bgr", "images": images}
 
     output_filename = output_dir / f"combiner_config_{palette_name}.json"
-    with open(output_filename, 'w', encoding="utf-8") as f:
+    with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
     print(f"Successfully created {output_filename}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Generate combiner.py configs for a folder of extracted PNGs.")
-    parser.add_argument("target_dir", type=Path,
-                        help="The directory containing folders of extracted PNGs.")
-    parser.add_argument("--output_dir", type=Path, default=Path("."),
-                        help="The directory to save the generated JSON configs.")
+    parser = argparse.ArgumentParser(description="Generate combiner.py configs for a folder of extracted PNGs.")
+    parser.add_argument("target_dir", type=Path, help="The directory containing folders of extracted PNGs.")
+    parser.add_argument("--output_dir", type=Path, default=Path("."), help="The directory to save the generated JSON configs.")
     args = parser.parse_args()
 
     if not args.target_dir.is_dir():
@@ -76,8 +64,7 @@ def main() -> None:
     subfolders = [d for d in args.target_dir.iterdir() if d.is_dir()]
 
     for palette_name, palette in PALETTES.items():
-        create_combiner_config(palette, subfolders,
-                               args.output_dir, palette_name)
+        create_combiner_config(palette, subfolders, args.output_dir, palette_name)
 
 
 if __name__ == "__main__":

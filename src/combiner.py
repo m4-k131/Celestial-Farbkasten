@@ -43,26 +43,23 @@ def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
         if "combination" in image_config:
             loaded_image = combine_config(image_config)
         elif image_config["path"].endswith(".json"):
-            loaded_image = combine_from_json(
-                image_config["path"], image_config["factor"])
+            loaded_image = combine_from_json(image_config["path"], image_config["factor"])
             if "clip" in image_config:
                 loaded_image = np.clip(loaded_image, 0, 255)
         else:
-            loaded_image = get_color_image(
-                image_config["path"], image_config["color"], image_config["factor"])
+            loaded_image = get_color_image(image_config["path"], image_config["color"], image_config["factor"])
         images.append(loaded_image)
 
     for i in range(1, len(images)):
         print(images[i].shape)
-        assert images[i-1].shape == images[i].shape
+        assert images[i - 1].shape == images[i].shape
     images = np.array(images)
     combined_image = images.sum(axis=0)
     if clip_image:
         combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     post_process = config.get("post_process")
     if post_process:
-        combined_image = adjust_saturation_contrast(
-            combined_image, post_process.get("saturation"), post_process.get("contrast"))
+        combined_image = adjust_saturation_contrast(combined_image, post_process.get("saturation"), post_process.get("contrast"))
     return combined_image
 
 
@@ -102,7 +99,7 @@ def main(input_json: str, imagename: str | None = None, suffix: str | None = Non
         outdir = COLOR_IMAGE
     os.makedirs(outdir, exist_ok=True)
     if imagename is None:
-        imagename = f'{os.path.basename(input_json).split(".")[0]}'
+        imagename = f"{os.path.basename(input_json).split('.')[0]}"
         print(imagename)
     imagename = f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
     cv2.imwrite(os.path.join(outdir, imagename), out_image)
@@ -111,8 +108,7 @@ def main(input_json: str, imagename: str | None = None, suffix: str | None = Non
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_json", type=str)
-    parser.add_argument("--imagename", required=False,
-                        help="Uses name of input_json if not given", type=str)
+    parser.add_argument("--imagename", required=False, help="Uses name of input_json if not given", type=str)
     parser.add_argument("--suffix", required=False, type=str)
     parser.add_argument("--outdir", required=False, type=str)
     args = parser.parse_args()

@@ -31,15 +31,13 @@ def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, proje
     # print(sessioninfo)
     if not exact_name:
         target_name = f"*{target_name}*"
-    obs_list = Observations.query_criteria(
-        target_name=target_name, dataproduct_type="image", calib_level=calib_levle, project=project)
+    obs_list = Observations.query_criteria(target_name=target_name, dataproduct_type="image", calib_level=calib_levle, project=project)
     target_name = target_name.strip("*")
     df = obs_list.to_pandas()
     if outdir is None:
         outdir = CSV_DIR
     os.makedirs(outdir, exist_ok=True)
-    df.to_csv(os.path.join(
-        outdir, f"{target_name if not exact_name else target_name+'_actual'}.csv"), index=False)
+    df.to_csv(os.path.join(outdir, f"{target_name if not exact_name else target_name + '_actual'}.csv"), index=False)
 
 
 if __name__ == "__main__":
@@ -50,5 +48,4 @@ if __name__ == "__main__":
     parser.add_argument("--project", default="JWST")
     parser.add_argument("--outdir", default=CSV_DIR)
     args = parser.parse_args()
-    main(args.target_name, args.exact_name,
-         args.calib_level, args.project, args.outdir)
+    main(args.target_name, args.exact_name, args.calib_level, args.project, args.outdir)

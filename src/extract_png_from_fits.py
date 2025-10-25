@@ -21,31 +21,27 @@ from skimage.transform import AffineTransform, warp
 from tqdm import tqdm
 
 STRETCH_FUNCTIONS = {
-    'BaseStretch': astropy.visualization.stretch.BaseStretch,
-    'LinearStretch': astropy.visualization.stretch.LinearStretch,
-    'SqrtStretch': astropy.visualization.stretch.SqrtStretch,
-    'PowerStretch': astropy.visualization.stretch.PowerStretch,
-    'PowerDistStretch': astropy.visualization.stretch.PowerDistStretch,
-    'SquaredStretch': astropy.visualization.stretch.SquaredStretch,
-    'LogStretch': astropy.visualization.stretch.LogStretch,
-    'AsinhStretch': astropy.visualization.stretch.AsinhStretch,
-    'SinhStretch': astropy.visualization.stretch.SinhStretch,
-    'HistEqStretch': astropy.visualization.stretch.HistEqStretch,
-    'ContrastBiasStretch': astropy.visualization.stretch.ContrastBiasStretch,
+    "BaseStretch": astropy.visualization.stretch.BaseStretch,
+    "LinearStretch": astropy.visualization.stretch.LinearStretch,
+    "SqrtStretch": astropy.visualization.stretch.SqrtStretch,
+    "PowerStretch": astropy.visualization.stretch.PowerStretch,
+    "PowerDistStretch": astropy.visualization.stretch.PowerDistStretch,
+    "SquaredStretch": astropy.visualization.stretch.SquaredStretch,
+    "LogStretch": astropy.visualization.stretch.LogStretch,
+    "AsinhStretch": astropy.visualization.stretch.AsinhStretch,
+    "SinhStretch": astropy.visualization.stretch.SinhStretch,
+    "HistEqStretch": astropy.visualization.stretch.HistEqStretch,
+    "ContrastBiasStretch": astropy.visualization.stretch.ContrastBiasStretch,
 }
 
 INTERVAL_FUNCTIONS = {
-    'ManualInterval': astropy.visualization.interval.ManualInterval,
-    'MinMaxInterval': astropy.visualization.interval.MinMaxInterval,
-    'AsymmetricPercentileInterval': astropy.visualization.interval.AsymmetricPercentileInterval,
-    'ZScaleInterval': astropy.visualization.interval.ZScaleInterval,
+    "ManualInterval": astropy.visualization.interval.ManualInterval,
+    "MinMaxInterval": astropy.visualization.interval.MinMaxInterval,
+    "AsymmetricPercentileInterval": astropy.visualization.interval.AsymmetricPercentileInterval,
+    "ZScaleInterval": astropy.visualization.interval.ZScaleInterval,
 }
 
-DEFAULT_MATCHING_PARAMS = {
-    "detection_sigma": 1.0,
-    "min_area": 4,
-    "max_control_points": 150
-}
+DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_points": 150}
 
 
 def unpack_and_run_worker(worker_args):
@@ -65,7 +61,7 @@ def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
         data = hdul[index].data
     data = np.nan_to_num(data, nan=0.0)
     dtype_kind = data.dtype.kind
-    native_float32_dtype = np.dtype(f'={dtype_kind}4')
+    native_float32_dtype = np.dtype(f"={dtype_kind}4")
     data = data.astype(native_float32_dtype, copy=True)
     # data += 1e-9 #Not needed anymore?
     return np.ascontiguousarray(data)
@@ -74,12 +70,11 @@ def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
 def get_normalized_images(data, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
     if stretch_function not in STRETCH_FUNCTIONS:
         print(f"{interval_function=} is not a valid stretch function. Available stretch functions are: {STRETCH_FUNCTIONS.keys()}. Using default AsinhStretch")
-        stretch_function = 'AsinhStretch'
+        stretch_function = "AsinhStretch"
     if interval_function not in INTERVAL_FUNCTIONS:
         print(f"{interval_function=} is not a valid interval function. Available interval functions are: {INTERVAL_FUNCTIONS.keys()}. Using default ZScaleInterval")
-        interval_function = 'ZScaleInterval'
-    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[interval_function](
-    ), stretch=STRETCH_FUNCTIONS[stretch_function]())
+        interval_function = "ZScaleInterval"
+    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[interval_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
     return norm(data)
 
 
@@ -87,13 +82,11 @@ def rescale_image_to_uint(source_data, percentile_black: float = 1.0, percentile
     """Rescales a float image to uint8, with options to replace out-of-band values."""
     nan_mask = np.isnan(source_data)
     with warnings.catch_warnings():  # Afaik ignoring the masked values is what we want
-        warnings.filterwarnings(
-            'ignore', message=".*'partition' will ignore the 'mask' of the MaskedArray.*")
+        warnings.filterwarnings("ignore", message=".*'partition' will ignore the 'mask' of the MaskedArray.*")
         black_level = np.nanpercentile(source_data, percentile_black)
         white_level = np.nanpercentile(source_data, percentile_white)
     if white_level <= black_level:
-        uint8_image = np.full(
-            source_data.shape, background_color, dtype=np.uint8)
+        uint8_image = np.full(source_data.shape, background_color, dtype=np.uint8)
         return uint8_image
     temp_float = np.empty(source_data.shape, dtype=np.float32)
 
@@ -122,17 +115,14 @@ def rescale_image_to_uint(source_data, percentile_black: float = 1.0, percentile
 
 def apply_transormation(source_data, transformation_params, output_shape):  # ???
     tform = AffineTransform(matrix=transformation_params)
-    transformed_data = warp(source_data, inverse_map=tform.inverse,
-                            preserve_range=True, output_shape=output_shape, cval=0)
+    transformed_data = warp(source_data, inverse_map=tform.inverse, preserve_range=True, output_shape=output_shape, cval=0)
     return transformed_data
 
 
 def process_data(raw_data, percentile_black: float = 0.1, percentile_white: float = 0.9, background_color: int = 0, replace_below_black: int | None = None, replace_above_white: int | None = None, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
-    normalized_data = get_normalized_images(
-        raw_data, stretch_function, interval_function)
+    normalized_data = get_normalized_images(raw_data, stretch_function, interval_function)
     normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
-    rescaled_image = rescale_image_to_uint(
-        normalized_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
+    rescaled_image = rescale_image_to_uint(normalized_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
     return rescaled_image
 
 
@@ -145,8 +135,7 @@ def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
             footprint = wcs.calc_footprint()
             return Polygon(footprint)
     except Exception as e:
-        print(
-            f"Warning: Could not get WCS footprint for {filepath}. Skipping. Error: {e}")
+        print(f"Warning: Could not get WCS footprint for {filepath}. Skipping. Error: {e}")
         return None
 
 
@@ -177,8 +166,7 @@ def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> s
                 # proj_plane_pixel_scales returns scale in degrees/pixel
                 pixel_scale = np.mean(proj_plane_pixel_scales(wcs))
                 scales[filepath] = pixel_scale
-                print(
-                    f"  - '{os.path.basename(filepath)}': Scale={pixel_scale * 3600:.4f} arcsec/pixel")
+                print(f"  - '{os.path.basename(filepath)}': Scale={pixel_scale * 3600:.4f} arcsec/pixel")
         except Exception:
             continue
     if not scales:
@@ -186,21 +174,16 @@ def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> s
         return None
     # Find the maximum scale (lowest resolution) and identify all candidates
     max_pixel_scale = max(scales.values())
-    lowest_res_candidates = [
-        path for path, scale in scales.items()
-        if np.isclose(scale, max_pixel_scale)
-    ]
+    lowest_res_candidates = [path for path, scale in scales.items() if np.isclose(scale, max_pixel_scale)]
     print(f"\nFound {len(lowest_res_candidates)} candidate(s) at lowest resolution (~{max_pixel_scale * 3600:.4f} arcsec/pixel).")
     if len(lowest_res_candidates) == 1:
         best_reference_path = lowest_res_candidates[0]
-        print(
-            f"Optimal reference is the sole lowest-resolution image: '{os.path.basename(best_reference_path)}'")
+        print(f"Optimal reference is the sole lowest-resolution image: '{os.path.basename(best_reference_path)}'")
         return best_reference_path
     # Optimizing Within the High-Resolution Group ---
     print("\n--- 2. Finding Best Overlap Within Lowest-Res Group ---")
     # Pre-calculate footprints for the candidates
-    footprints = {path: _get_wcs_footprint_polygon(
-        path, hdu_index) for path in lowest_res_candidates}
+    footprints = {path: _get_wcs_footprint_polygon(path, hdu_index) for path in lowest_res_candidates}
     overlap_scores = {}
     for candidate_path in lowest_res_candidates:
         candidate_poly = footprints[candidate_path]
@@ -215,14 +198,12 @@ def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> s
                 continue
             total_overlap_area += candidate_poly.intersection(other_poly).area
         overlap_scores[candidate_path] = total_overlap_area
-        print(
-            f"  - Overlap score for {os.path.basename(candidate_path)}: {total_overlap_area:.4f}")
+        print(f"  - Overlap score for {os.path.basename(candidate_path)}: {total_overlap_area:.4f}")
     if not overlap_scores:
         print("Error: Could not calculate overlap scores. Returning first candidate.")
         return lowest_res_candidates[0]
     best_reference_path = max(overlap_scores, key=overlap_scores.get)
-    print(
-        f"Optimal reference is '{os.path.basename(best_reference_path)}' (best overlap in low-res group).")
+    print(f"Optimal reference is '{os.path.basename(best_reference_path)}' (best overlap in low-res group).")
     return best_reference_path
 
 
@@ -242,8 +223,7 @@ def setup_alignment_reference(dict_to_process: dict):  # return?
     if best_ref_filepath is None:
         print("Error: Could not determine a reference image.")
         return None, None, None
-    print(
-        f"Using '{os.path.basename(best_ref_filepath)}' as the reference for alignment.")
+    print(f"Using '{os.path.basename(best_ref_filepath)}' as the reference for alignment.")
     # Get the primary science HDU index for the reference file
     ref_hdu_index = dict_to_process["fits_files"][best_ref_filepath]["fits_indices"][0]
     with fits.open(best_ref_filepath) as ref_hdul:
@@ -272,8 +252,8 @@ def find_best_reference_image(transformations):  # np.ndarray?
                 continue
             params = transformations[other_path].get(ref_path)
             tx, ty = None, None
-            if isinstance(params, dict) and 'translation' in params:
-                tx, ty = params['translation']
+            if isinstance(params, dict) and "translation" in params:
+                tx, ty = params["translation"]
             elif isinstance(params, np.ndarray) and params.shape == (3, 3):
                 # Translation in x is the 3rd element of the 1st row
                 tx = params[0, 2]
@@ -283,15 +263,14 @@ def find_best_reference_image(transformations):  # np.ndarray?
                 distance = np.sqrt(tx**2 + ty**2)
                 total_distance += distance
             else:
-                print(
-                    f"Warning: Could not extract translation from {other_path} to {ref_path}")
+                print(f"Warning: Could not extract translation from {other_path} to {ref_path}")
                 total_distance += np.inf
         centrality_scores[ref_path] = total_distance
     if not centrality_scores:
         return None
     print("\nCentrality Scores (lower is better):")
     for path, score in centrality_scores.items():
-        filename = path.split('/')[-1]
+        filename = path.split("/")[-1]
         print(f"  - {filename:<45}: {score:.2f}")
     best_reference = min(centrality_scores, key=centrality_scores.get)
     return best_reference
@@ -306,8 +285,7 @@ def _worker(params: dict, output_dir: str, data_to_process) -> None | Exception:
         filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
         full_outpath = os.path.join(output_dir, filename)
         if not os.path.exists(full_outpath):
-            processed_data = process_data(
-                data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
+            processed_data = process_data(data_to_process, p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn)
             cv2.imwrite(full_outpath, processed_data)
         return None  # Indicate success
     except Exception as e:
@@ -326,8 +304,7 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
 
     """
     shm = shared_memory.SharedMemory(create=True, size=data_to_process.nbytes)
-    shm_np_array = np.ndarray(data_to_process.shape,
-                              dtype=data_to_process.dtype, buffer=shm.buf)
+    shm_np_array = np.ndarray(data_to_process.shape, dtype=data_to_process.dtype, buffer=shm.buf)
     shm_np_array[:] = data_to_process[:]
     try:
         for param_item in processing_params:
@@ -337,17 +314,10 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
                 with open(param_item, "r", encoding="utf-8") as f:
                     loaded_param_set = json.load(f)
             if not isinstance(loaded_param_set, dict):
-                print(
-                    f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
+                print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
                 continue
-            all_params = itertools.product(
-                loaded_param_set["percentile_black"], loaded_param_set["percentile_white"],
-                loaded_param_set["background_color"], loaded_param_set["replace_below_black"],
-                loaded_param_set["replace_above_white"], loaded_param_set["stretch_function"],
-                loaded_param_set["interval_function"]
-            )
-            valid_params = [p for p in all_params if p[1]
-                            > p[0]]  # p[1] is p_w, p[0] is p_b
+            all_params = itertools.product(loaded_param_set["percentile_black"], loaded_param_set["percentile_white"], loaded_param_set["background_color"], loaded_param_set["replace_below_black"], loaded_param_set["replace_above_white"], loaded_param_set["stretch_function"], loaded_param_set["interval_function"])
+            valid_params = [p for p in all_params if p[1] > p[0]]  # p[1] is p_w, p[0] is p_b
             # print(valid_params, valid_params)
             tasks_to_run = []
             for params in valid_params:
@@ -355,14 +325,12 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
                 filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
                 full_outpath = os.path.join(output_dir, filename)
                 if overwrite or not os.path.exists(full_outpath):
-                    tasks_to_run.append(
-                        (params, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
+                    tasks_to_run.append((params, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
             if not tasks_to_run:
                 print("   -> All PNGs already exist. Skipping generation.")
                 continue
             with ProcessPoolExecutor() as executor:
-                list(tqdm(executor.map(unpack_and_run_worker, tasks_to_run),
-                     total=len(tasks_to_run), desc="   -> Generating PNGs"))
+                list(tqdm(executor.map(unpack_and_run_worker, tasks_to_run), total=len(tasks_to_run), desc="   -> Generating PNGs"))
     finally:
         shm.close()
         shm.unlink()
@@ -374,8 +342,7 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no
         outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)
     if not no_matching:
-        best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(
-            dict_to_process)
+        best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
         if best_ref_filepath is None:
             return  # Abort if reference setup failed
     print("\n--- 2. Processing and Aligning Individual Files ---")
@@ -394,21 +361,13 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no
             else:
                 print(f"  -> Reprojecting HDU {index} to reference...")
                 with fits.open(filepath) as src_hdul:
-                    data_to_process, _ = reproject_interp(
-                        src_hdul[index], reference_header, shape_out=reference_shape
-                    )
+                    data_to_process, _ = reproject_interp(src_hdul[index], reference_header, shape_out=reference_shape)
             if data_to_process is not None:
-                process_and_save_pngs(
-                    data_to_process,
-                    params["processing_params"],
-                    image_output_dir,
-                    overwrite
-                )
+                process_and_save_pngs(data_to_process, params["processing_params"], image_output_dir, overwrite)
                 del data_to_process
                 gc.collect()
             else:
-                print(
-                    f"ERROR: Failed to load or align data for HDU {index}. Skipping.")
+                print(f"ERROR: Failed to load or align data for HDU {index}. Skipping.")
     print("\nProcessing complete.")
 
 
