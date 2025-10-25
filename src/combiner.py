@@ -50,11 +50,7 @@ def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
             gray_image = cv2.imread(image_config["path"], cv2.IMREAD_GRAYSCALE)
             if gray_image is None:
                 raise FileNotFoundError(f"Could not load image at path: {image_config['path']}")
-            loaded_image = get_color_image(
-                gray_image,
-                image_config["color"],
-                image_config["factor"]
-            )
+            loaded_image = get_color_image(gray_image, image_config["color"], image_config["factor"])
         images.append(loaded_image)
 
     for i in range(1, len(images)):

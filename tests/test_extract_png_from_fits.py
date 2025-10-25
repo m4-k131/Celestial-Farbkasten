@@ -78,9 +78,6 @@ def test_rescale_clipping_and_replace(sample_float_image):
     assert rescaled[9, 0] == VAL_ABOVE_WHITE
 
 
-
-
-
 def test_process_and_save_pngs_task_generation():
     """
     Tests that process_and_save_pngs generates the correct task list
@@ -90,35 +87,21 @@ def test_process_and_save_pngs_task_generation():
     dummy_data = np.array([1, 2], dtype=np.float32)
 
     # 2. A mock parameter set
-    mock_params = {
-        "percentile_black": [10, 20],
-        "percentile_white": [99],
-        "background_color": [0],
-        "replace_below_black": [0],
-        "replace_above_white": [255],
-        "stretch_function": ["AsinhStretch"],
-        "interval_function": ["ZScaleInterval"]
-    }
+    mock_params = {"percentile_black": [10, 20], "percentile_white": [99], "background_color": [0], "replace_below_black": [0], "replace_above_white": [255], "stretch_function": ["AsinhStretch"], "interval_function": ["ZScaleInterval"]}
 
     test_outdir = "fake/output/dir"
 
     # 3. Mock all external dependencies
     # We patch SharedMemory, np.ndarray (to avoid buffer errors),
     # ProcessPoolExecutor, and os.path.exists
-    with patch('src.extract_png_from_fits.shared_memory.SharedMemory'), \
-         patch('src.extract_png_from_fits.np.ndarray'), \
-         patch('src.extract_png_from_fits.ProcessPoolExecutor') as mock_executor, \
-         patch('src.extract_png_from_fits.os.path.exists') as mock_exists, \
-         patch('builtins.open'), \
-         patch('src.extract_png_from_fits.json.load', return_value=mock_params):
-
+    with patch("src.extract_png_from_fits.shared_memory.SharedMemory"), patch("src.extract_png_from_fits.np.ndarray"), patch("src.extract_png_from_fits.ProcessPoolExecutor") as mock_executor, patch("src.extract_png_from_fits.os.path.exists") as mock_exists, patch("builtins.open"), patch("src.extract_png_from_fits.json.load", return_value=mock_params):
         # 4. Configure os.path.exists mock
         # Let's pretend the first file (b10_w99...) already exists
         # and the second one (b20_w99...) does not.
         def side_effect(path):
             if "b10_w99" in path:
                 return True  # File exists
-            return False # File does not exist
+            return False  # File does not exist
 
         mock_exists.side_effect = side_effect
 
@@ -128,9 +111,9 @@ def test_process_and_save_pngs_task_generation():
         # 5. --- Run the function ---
         process_and_save_pngs(
             data_to_process=dummy_data,
-            processing_params=["dummy.json"], # Will be mocked by json.load
+            processing_params=["dummy.json"],  # Will be mocked by json.load
             output_dir=test_outdir,
-            overwrite=False
+            overwrite=False,
         )
 
         # 6. --- Assertions ---
@@ -144,6 +127,6 @@ def test_process_and_save_pngs_task_generation():
         assert len(tasks_passed_to_map) == 1
 
         # Check that the single task has the correct parameters
-        task_params = tasks_passed_to_map[0][0] # params tuple
+        task_params = tasks_passed_to_map[0][0]  # params tuple
         assert task_params[0] == VAL_PERCENTILE_BLACK  # percentile_black
         assert task_params[1] == VAL_PERCENTILE_WHITE  # percentile_white
