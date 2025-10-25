@@ -1,5 +1,9 @@
 [tool.ruff]
+# Equivalent to Pylint's 'source-roots = src'
 src = ["src"]
+
+# Set to a high number to match your 'disable = line-too-long'
+# This controls the formatter.
 line-length = 1000
 
 [tool.ruff.lint]
@@ -31,7 +35,7 @@ ignore = [
     # 'fixme'
     "FIX002", # TODO, FIXME, XXX comments
 
-    # 'broad-exception-caught' (this is the correct rule)
+    # 'broad-exception-caught'
     "BLE001", # Do not catch 'Exception'
 
     # 'too-many-arguments'
@@ -42,4 +46,10 @@ ignore = [
 
     # 'too-many-locals'
     "PLR0914",
+    
+    # --- FIXES FOR WARNINGS ---
+    # Incompatible with D211 (no-blank-line-before-class)
+    "D203",
+    # Incompatible with D212 (multi-line-summary-first-line)
+    "D213",
 ]
