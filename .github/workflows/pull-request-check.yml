@@ -1,0 +1,40 @@
+# .github/workflows/pull-request-check.yml
+name: PR Check & Test
+
+# This workflow runs only when a pull request is made to the 'main' branch
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"] # You can add other versions
+
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5 # Using v5, which is newer
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip' # Cache dependencies to speed up future runs
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Install all dependencies at once
+        pip install ruff pytest 
+        pip install -r requirements.txt
+
+    - name: Run Ruff Linter (Check only)
+      run: |
+        # This just checks for errors, it doesn't fix or commit
+        ruff check . --output-format=github
+
+    - name: Test with pytest
+      run: |
+        pytest

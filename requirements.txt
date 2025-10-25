@@ -7,3 +7,4 @@ dotenv
 opencv-python
 shapely
 reproject
+pytest
