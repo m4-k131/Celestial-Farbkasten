@@ -1,13 +1,20 @@
 [tool.ruff]
 src = ["src"]
-line-length = 250
+line-length = 1000
 
 [tool.ruff.lint]
-# Pyflakes(F), pycodestyle(E,W), Bugbear(B), pydocstyle(D),
-# isort(I), Pylint(PL), and flake8-fixme(FIX)
-select = ["E", "F", "W", "B", "D", "I", "PL", "FIX"]
+select = [
+    "E",  # pycodestyle Errors
+    "F",  # Pyflakes
+    "W",  # pycodestyle Warnings
+    "B",  # flake8-bugbear
+    "D",  # pydocstyle
+    "I",  # isort
+    "PL", # Pylint
+    "FIX",# flake8-fixme
+    "BLE",# flake8-blind-except
+]
 
-# This list directly translates your 'disable' list from .pylintrc 
 ignore = [
     # 'line-too-long'
     "E501",
@@ -24,8 +31,8 @@ ignore = [
     # 'fixme'
     "FIX002", # TODO, FIXME, XXX comments
 
-    # 'broad-exception-caught'
-    "B001",   # Do not use 'except Exception'
+    # 'broad-exception-caught' (this is the correct rule)
+    "BLE001", # Do not catch 'Exception'
 
     # 'too-many-arguments'
     "PLR0913",

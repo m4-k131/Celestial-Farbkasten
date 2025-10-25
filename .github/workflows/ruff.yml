@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.10"]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -24,4 +24,4 @@ jobs:
     - name: Run Ruff (Linting and Formatting Check)
       run: |
         ruff format . --check --output-format=github
-        ruff check src --output-format=github
+        ruff check . --output-format=github
