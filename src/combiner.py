@@ -4,6 +4,7 @@ import os
 
 import cv2
 import numpy as np
+
 from lib.colors import COLORS
 from paths import COLOR_IMAGE
 

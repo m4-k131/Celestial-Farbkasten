@@ -1,10 +1,11 @@
-import numpy as np
-import pytest
-import cv2
 from unittest.mock import patch
 
+import cv2
+import numpy as np
+import pytest
+
 # Assumes pytest.ini is set up with 'pythonpath = src'
-from src.combiner import get_color_image, adjust_saturation_contrast
+from src.combiner import adjust_saturation_contrast, get_color_image
 
 # --- Constants for Tests ---
 TEST_COLOR_TUPLE = (100, 50, 20)  # BGR

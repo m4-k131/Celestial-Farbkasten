@@ -3,8 +3,9 @@ import os
 
 import pandas as pd
 import requests
-from paths import DOWNLOAD_DIR
 from tqdm import tqdm
+
+from paths import DOWNLOAD_DIR
 
 BASE_URL = "https://mast.stsci.edu/api/v0.1/Download/file?uri="
 DEFAULT_TIMEOUT = 300

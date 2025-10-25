@@ -14,11 +14,12 @@ from astropy.io import fits
 from astropy.visualization import ImageNormalize
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from paths import EXTRACTED_PNG_DIR
 from reproject import reproject_interp
 from shapely.geometry import Polygon
 from skimage.transform import AffineTransform, warp
 from tqdm import tqdm
+
+from paths import EXTRACTED_PNG_DIR
 
 STRETCH_FUNCTIONS = {
     "BaseStretch": astropy.visualization.stretch.BaseStretch,
@@ -89,11 +90,10 @@ def rescale_image_to_uint(source_data, percentile_black: float = 1.0, percentile
         uint8_image = np.full(source_data.shape, background_color, dtype=np.uint8)
         return uint8_image
     temp_float = np.empty(source_data.shape, dtype=np.float32)
-
     # Perform all arithmetic and clipping operations in-place on the temp array.
     denominator = white_level - black_level
     if denominator == 0:
-        denominator = 1  # Avoid division by zero
+        denominator = 1
 
     np.subtract(source_data, black_level, out=temp_float)
     np.divide(temp_float, denominator, out=temp_float)

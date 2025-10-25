@@ -4,6 +4,7 @@ from getpass import getpass
 
 from astroquery.mast import Observations
 from dotenv import load_dotenv
+
 from paths import CSV_DIR
 
 # pylint:disable=no-member

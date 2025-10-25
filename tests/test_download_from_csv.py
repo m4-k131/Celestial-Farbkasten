@@ -1,9 +1,11 @@
 import os
-import pytest
-import pandas as pd
-from unittest.mock import patch, call
+from unittest.mock import call, patch
 
-from src.download_from_csv import main as download_main, BASE_URL
+import pandas as pd
+import pytest
+
+from src.download_from_csv import BASE_URL
+from src.download_from_csv import main as download_main
 
 DOWNLOAD_ALL_DOWNLOAD_ASSERTION = 5
 DOWNLOAD_ALL_ISFILE_ASSERTION = 5

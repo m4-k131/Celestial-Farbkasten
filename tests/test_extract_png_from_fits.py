@@ -1,9 +1,10 @@
-import numpy as np
-import pytest
 from unittest.mock import patch
 
-from src.extract_png_from_fits import rescale_image_to_uint, process_and_save_pngs
+import numpy as np
+import pytest
 
+from src.extract_png_from_fits import (process_and_save_pngs,
+                                       rescale_image_to_uint)
 
 VAL_0_PERCENT = 0
 VAL_99_PERCENT = 255
