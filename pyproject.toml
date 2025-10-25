@@ -1,0 +1,33 @@
+[tool.ruff]
+# Equivalent to Pylint's 'source-roots = src'
+src = ["src"]
+
+# Set to a high number to match your 'disable = line-too-long'
+# This controls the formatter.
+line-length = 1000
+
+[tool.ruff.lint]
+# "D" (pydocstyle) and "FIX" (flake8-fixme) have been removed.
+select = [
+    "E",  # pycodestyle Errors
+    "F",  # Pyflakes
+    "W",  # pycodestyle Warnings
+    "B",  # flake8-bugbear
+    "I",  # isort
+    "PL", # Pylint
+    "BLE",# flake8-blind-except
+]
+
+# Enable auto-fixes for rules like unused-imports (F401)
+fixable = ["ALL"]
+
+# All "D" and "FIX" rules are removed from ignore, as they are no longer selected.
+ignore = [
+    # --- Original Pylint ignores ---
+    "E501",   # line-too-long
+    "I",      # isort (wrong-import-order)
+    "BLE001", # broad-exception-caught
+    "PLR0913",# too-many-arguments
+    "PLR0917",# too-many-positional-arguments
+    "PLR0914",# too-many-locals
+]

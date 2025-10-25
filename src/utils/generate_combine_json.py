@@ -5,7 +5,7 @@ from pathlib import Path
 from lib.colors import PALETTES
 
 
-def get_wavelength_from_folder(folder_name):
+def get_wavelength_from_folder(folder_name: str) -> str | None:
     """Extracts the wavelength string from a folder name."""
     try:
         return folder_name.split("_")[-2]
@@ -13,7 +13,7 @@ def get_wavelength_from_folder(folder_name):
         return None
 
 
-def select_png_for_region(region):
+def select_png_for_region(region: str) -> str:
     """Selects PNG file parameters based on the desired intensity region."""
     if region == "high":
         return "b80_w99.5_nan0_bb0_aw255_Asinh_ZScale.png"
@@ -22,7 +22,7 @@ def select_png_for_region(region):
     return "b40_w99.7_nan0_bb0_aw255_Asinh_ZScale.png"
 
 
-def create_combiner_config(palette, png_folders, output_dir, palette_name):
+def create_combiner_config(palette: dict, png_folders: str, output_dir: str, palette_name: str) -> None:
     """Creates a single combiner JSON configuration file."""
     images = []
     for wavelength_keyword, region, color, factor in palette:
@@ -33,38 +33,26 @@ def create_combiner_config(palette, png_folders, output_dir, palette_name):
                 image_path = folder_path / png_filename
 
                 if image_path.exists():
-                    images.append({
-                        "path": str(image_path),
-                        "color": color,
-                        "factor": factor
-                    })
+                    images.append({"path": str(image_path), "color": color, "factor": factor})
                 else:
                     print(f"Warning: Could not find {image_path}. Skipping.")
 
     if not images:
-        print(
-            f"Warning: No images found for palette '{palette_name}'. Skipping config generation.")
+        print(f"Warning: No images found for palette '{palette_name}'. Skipping config generation.")
         return
 
-    config = {
-        "operand": "+",
-        "colorspace": "bgr",
-        "images": images
-    }
+    config = {"operand": "+", "colorspace": "bgr", "images": images}
 
     output_filename = output_dir / f"combiner_config_{palette_name}.json"
-    with open(output_filename, 'w', encoding="utf-8") as f:
+    with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
     print(f"Successfully created {output_filename}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate combiner.py configs for a folder of extracted PNGs.")
-    parser.add_argument("target_dir", type=Path,
-                        help="The directory containing folders of extracted PNGs.")
-    parser.add_argument("--output_dir", type=Path, default=Path("."),
-                        help="The directory to save the generated JSON configs.")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate combiner.py configs for a folder of extracted PNGs.")
+    parser.add_argument("target_dir", type=Path, help="The directory containing folders of extracted PNGs.")
+    parser.add_argument("--output_dir", type=Path, default=Path("."), help="The directory to save the generated JSON configs.")
     args = parser.parse_args()
 
     if not args.target_dir.is_dir():
@@ -76,8 +64,7 @@ def main():
     subfolders = [d for d in args.target_dir.iterdir() if d.is_dir()]
 
     for palette_name, palette in PALETTES.items():
-        create_combiner_config(palette, subfolders,
-                               args.output_dir, palette_name)
+        create_combiner_config(palette, subfolders, args.output_dir, palette_name)
 
 
 if __name__ == "__main__":
