@@ -47,7 +47,10 @@ def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
             if "clip" in image_config:
                 loaded_image = np.clip(loaded_image, 0, 255)
         else:
-            loaded_image = get_color_image(image_config["path"], image_config["color"], image_config["factor"])
+            gray_image = cv2.imread(image_config["path"], cv2.IMREAD_GRAYSCALE)
+            if gray_image is None:
+                raise FileNotFoundError(f"Could not load image at path: {image_config['path']}")
+            loaded_image = get_color_image(gray_image, image_config["color"], image_config["factor"])
         images.append(loaded_image)
 
     for i in range(1, len(images)):
@@ -73,11 +76,8 @@ def combine_from_json(json_path: str, factor: float | int = 1) -> np.ndarray:
     return out_image
 
 
-def get_color_image(path: str, color: str | tuple, factor: float | int = 1) -> np.ndarray:
+def get_color_image(gray_image: np.ndarray, color: str | tuple, factor: float | int = 1) -> np.ndarray:
     """Applies a color to a grayscale image, returning a float32 BGR image."""
-    gray_image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    if gray_image is None:
-        raise FileNotFoundError(f"Could not load image at path: {path}")
     normalized_gray = gray_image.astype(np.float32) / 255.0
     if isinstance(color, str):
         if color in COLORS:
