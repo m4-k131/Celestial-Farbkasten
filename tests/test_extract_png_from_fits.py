@@ -87,6 +87,7 @@ def test_process_and_save_pngs_task_generation():
             if "b10_w99" in path:
                 return True  # File exists
             return False  # File does not exist
+
         mock_exists.side_effect = side_effect
         # Get the 'map' method from the executor instance
         mock_map = mock_executor.return_value.__enter__.return_value.map
