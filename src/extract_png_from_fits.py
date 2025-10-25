@@ -330,20 +330,21 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
                               dtype=data_to_process.dtype, buffer=shm.buf)
     shm_np_array[:] = data_to_process[:]
     try:
-        for param_set in processing_params:
-            print(param_set)
-            if isinstance(param_set, str) and param_set.endswith(".json"):
-                with open(param_set, "r", encoding="utf-8") as f:
-                    param_set = json.load(f)
-            if not isinstance(param_set, dict):
+        for param_item in processing_params:
+            print(param_item)
+            loaded_param_set = param_item
+            if isinstance(param_item, str) and param_item.endswith(".json"):
+                with open(param_item, "r", encoding="utf-8") as f:
+                    loaded_param_set = json.load(f)
+            if not isinstance(loaded_param_set, dict):
                 print(
-                    f"Warning: Invalid processing parameter set found. Skipping: {param_set}")
+                    f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
                 continue
             all_params = itertools.product(
-                param_set["percentile_black"], param_set["percentile_white"],
-                param_set["background_color"], param_set["replace_below_black"],
-                param_set["replace_above_white"], param_set["stretch_function"],
-                param_set["interval_function"]
+                loaded_param_set["percentile_black"], loaded_param_set["percentile_white"],
+                loaded_param_set["background_color"], loaded_param_set["replace_below_black"],
+                loaded_param_set["replace_above_white"], loaded_param_set["stretch_function"],
+                loaded_param_set["interval_function"]
             )
             valid_params = [p for p in all_params if p[1]
                             > p[0]]  # p[1] is p_w, p[0] is p_b
