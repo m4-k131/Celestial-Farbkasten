@@ -79,7 +79,14 @@ def test_process_and_save_pngs_task_generation():
     mock_params = {"percentile_black": [10, 20], "percentile_white": [99], "background_color": [0], "replace_below_black": [0], "replace_above_white": [255], "stretch_function": ["AsinhStretch"], "interval_function": ["ZScaleInterval"]}
     test_outdir = "fake/output/dir"
 
-    with patch("src.extract_png_from_fits.shared_memory.SharedMemory"), patch("src.extract_png_from_fits.np.ndarray"), patch("src.extract_png_from_fits.ProcessPoolExecutor") as mock_executor, patch("src.extract_png_from_fits.os.path.exists") as mock_exists, patch("builtins.open"), patch("src.extract_png_from_fits.json.load", return_value=mock_params):
+    with (
+        patch("src.extract_png_from_fits.shared_memory.SharedMemory"),
+        patch("src.extract_png_from_fits.np.ndarray"),
+        patch("src.extract_png_from_fits.ProcessPoolExecutor") as mock_executor,
+        patch("src.extract_png_from_fits.os.path.exists") as mock_exists,
+        patch("builtins.open"),
+        patch("src.extract_png_from_fits.json.load", return_value=mock_params),
+    ):
         # Let's pretend the first file (b10_w99...) already exists
         # and the second one (b20_w99...) does not.
         def side_effect(path):

@@ -63,6 +63,8 @@ def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
         combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     post_process = config.get("post_process")
     if post_process:
+        combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
+        print(combined_image)
         combined_image = adjust_saturation_contrast(combined_image, post_process.get("saturation"), post_process.get("contrast"))
     return combined_image
 
@@ -92,7 +94,7 @@ def get_color_image(gray_image: np.ndarray, color: str | tuple, factor: float | 
     return colored_image
 
 
-def main(input_json: str, imagename: str | None = None, suffix: str | None = None, outdir: str | None = None) -> None:
+def main(input_json: str, imagename: str | None = None, suffix: str | None = None, outdir: str | None = None, overwrite=False) -> None:
     with open(input_json, "r", encoding="utf-8") as f:
         config = json.load(f)
     out_image = combine_config(config, clip_image=True)
@@ -102,8 +104,14 @@ def main(input_json: str, imagename: str | None = None, suffix: str | None = Non
     if imagename is None:
         imagename = f"{os.path.basename(input_json).split('.')[0]}"
         print(imagename)
-    imagename = f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
-    cv2.imwrite(os.path.join(outdir, imagename), out_image)
+    finalname = f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
+    i = 0
+    while os.path.isfile(os.path.join(outdir, finalname)) and not overwrite:
+        finalname = f"{imagename}_{i}.png" if suffix is None else f"{imagename}_{suffix}_{i}.png"
+        i += 1
+    cv2.imwrite(os.path.join(outdir, finalname), out_image)
+    with open(os.path.join(outdir, f"{finalname[:-4]}.json"), "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4)
 
 
 if __name__ == "__main__":
@@ -112,5 +120,6 @@ if __name__ == "__main__":
     parser.add_argument("--imagename", required=False, help="Uses name of input_json if not given", type=str)
     parser.add_argument("--suffix", required=False, type=str)
     parser.add_argument("--outdir", required=False, type=str)
+    parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
     main(args.input_json, args.imagename, args.suffix, args.outdir)

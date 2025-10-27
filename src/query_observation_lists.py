@@ -43,7 +43,7 @@ def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, proje
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("target_name", required=True, type=str)
+    parser.add_argument("target_name", type=str)
     parser.add_argument("--exact_name", action="store_true")
     parser.add_argument("--calib_level", default=3)
     parser.add_argument("--project", default="JWST")

@@ -6,6 +6,7 @@ import os
 import warnings
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import shared_memory
+from dataclasses import dataclass
 
 import astropy
 import cv2
@@ -45,6 +46,21 @@ INTERVAL_FUNCTIONS = {
 DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_points": 150}
 
 
+@dataclass
+class NormalizeConfig:
+    stretch_function: str = "AsinhStretch"
+    interval_function: str = "ZScaleInterval"
+
+
+@dataclass
+class RescaleConfig:
+    percentile_black: float = 0.1
+    percentile_white: float = 0.9
+    background_color: int = 0
+    replace_below_black: int | None = None
+    replace_above_white: int | None = None
+
+
 def unpack_and_run_worker(worker_args):
     """Helper function to unpack arguments and call the main worker.
     This is needed because executor.map passes a single argument.
@@ -64,7 +80,6 @@ def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
     dtype_kind = data.dtype.kind
     native_float32_dtype = np.dtype(f"={dtype_kind}4")
     data = data.astype(native_float32_dtype, copy=True)
-    # data += 1e-9 #Not needed anymore?
     return np.ascontiguousarray(data)
 
 
@@ -119,7 +134,16 @@ def apply_transormation(source_data, transformation_params, output_shape):  # ??
     return transformed_data
 
 
-def process_data(raw_data, percentile_black: float = 0.1, percentile_white: float = 0.9, background_color: int = 0, replace_below_black: int | None = None, replace_above_white: int | None = None, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
+def process_data(
+    raw_data,
+    percentile_black: float = 0.1,
+    percentile_white: float = 0.9,
+    background_color: int = 0,
+    replace_below_black: int | None = None,
+    replace_above_white: int | None = None,
+    stretch_function: str = "AsinhStretch",
+    interval_function: str = "ZScaleInterval",
+) -> np.ndarray:
     normalized_data = get_normalized_images(raw_data, stretch_function, interval_function)
     normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
     rescaled_image = rescale_image_to_uint(normalized_data, percentile_black, percentile_white, background_color, replace_below_black, replace_above_white)
@@ -316,7 +340,15 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
             if not isinstance(loaded_param_set, dict):
                 print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
                 continue
-            all_params = itertools.product(loaded_param_set["percentile_black"], loaded_param_set["percentile_white"], loaded_param_set["background_color"], loaded_param_set["replace_below_black"], loaded_param_set["replace_above_white"], loaded_param_set["stretch_function"], loaded_param_set["interval_function"])
+            all_params = itertools.product(
+                loaded_param_set["percentile_black"],
+                loaded_param_set["percentile_white"],
+                loaded_param_set["background_color"],
+                loaded_param_set["replace_below_black"],
+                loaded_param_set["replace_above_white"],
+                loaded_param_set["stretch_function"],
+                loaded_param_set["interval_function"],
+            )
             valid_params = [p for p in all_params if p[1] > p[0]]  # p[1] is p_w, p[0] is p_b
             # print(valid_params, valid_params)
             tasks_to_run = []
