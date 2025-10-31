@@ -19,7 +19,8 @@ Running all the commands
 in these boxes 
 ```
 
-will create an example False Color Image for Messer 74.
+will create an example False Color Image for LDN-1527.
+It is a "smaller" obersvation, but the downloading and extracting still takes a little bit of time. 
 
 ## 1. query_observation_lists.py
 
@@ -78,7 +79,7 @@ will give us JPGs of different observations.
 python src/download_from_csv.py "outputs/csv/LDN-1527_actual.csv"
 ```
 
-This will then download the fits for the obervation with the identifier. 
+This will then download the fits for the obervation. We can use --must_contain="YOUR_STRING_HERE" to select downloads without re-quering a CSV.
 
 ---
 
@@ -102,7 +103,7 @@ python src/extract_png_from_fits.py "configs\extract\LDN-1527\LDN-1527_extract_a
 
 This script combines several processed PNGs into a single full-color composite image. It uses a JSON configuration file to assign specific images to color channels and set their brightness.
 
-* `--input_json` (required): Path to the JSON file that configures the image combination.
+* `input_json` (required): Path to the JSON file that configures the image combination.
 * `--imagename` (optional): The base name for the final output image.
 * `--suffix` (optional): A suffix to append to the output filename.
 * `--outdir` (optional, default: outs): The directory for the final image.
@@ -115,80 +116,4 @@ python combiner.py configs\combine\LDN-1527\ldn-1527_combined_1.json
 
 ### JSON Schemas:
 
-```
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Image Processing Parameters",
-  "description": "A schema for defining parameter grids for MAST image processing normalization.",
-  "type": "object",
-  "properties": {
-    "stretch_function": {
-      "description": "A list of stretching functions to apply to the raw image data.",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "LinearStretch",
-          "SqrtStretch",
-          "LogStretch",
-          "AsinhStretch"
-        ]
-      }
-    },
-    "percentile_black": {
-      "description": "A list of percentile values to map to black.",
-      "type": "array",
-      "items": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 100
-      }
-    },
-    "percentile_white": {
-      "description": "A list of percentile values to map to white.",
-      "type": "array",
-      "items": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 100
-      }
-    },
-    "background_color": {
-      "description": "A list of background color values, likely for masking or padding.",
-      "type": "array",
-      "items": {
-        "type": "integer"
-        "minimum": 0,
-        "maximum": 255
-      }
-    },
-    "replace_below_black": {
-      "description": "A list of values to replace pixels that are darker than the black point.",
-      "type": "array",
-      "items": {
-        "type": "integer"
-        "minimum": 0,
-        "maximum": 255
-      }
-    },
-    "replace_above_white": {
-      "description": "A list of values to replace pixels that are brighter than the white point.",
-      "type": "array",
-      "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      }
-    }
-  },
-  "required": [
-    "stretch_function",
-    "percentile_black",
-    "percentile_white",
-    "background_color",
-    "replace_below_black",
-    "replace_above_white"
-  ]
-}
-
-```
+TODO 
