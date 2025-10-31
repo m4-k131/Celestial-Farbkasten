@@ -3,7 +3,12 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from src.extract_png_from_fits import process_and_save_pngs, rescale_image_to_uint
+from src.extract_png_from_fits import (
+    process_and_save_pngs,
+    rescale_image_to_uint,
+    RescaleConfig,
+    ProcessingConfig,  # Assuming you created this dataclass as we discussed
+)
 
 VAL_0_PERCENT = 0
 VAL_99_PERCENT = 255
@@ -27,12 +32,14 @@ def sample_float_image():
 def test_rescale_basic(sample_float_image):
     """Tests a basic 0-100% percentile rescale."""
     # Note: np.nanpercentile ignores NaNs, so 0% is 0.0 and 100% is 99.0
-    rescaled = rescale_image_to_uint(
-        sample_float_image,
+    config = RescaleConfig(
         percentile_black=0.0,
         percentile_white=100.0,
         background_color=VAL_NAN_BG,
+        replace_below_black=None,  # Explicitly set defaults
+        replace_above_white=None,  # Explicitly set defaults
     )
+    rescaled = rescale_image_to_uint(sample_float_image, config)
     # Check that 0.0 maps to 0
     assert rescaled[0, 0] == VAL_0_PERCENT
     # Check that 99.0 maps to 255
@@ -48,13 +55,14 @@ def test_rescale_clipping_and_replace(sample_float_image):
     black_level = np.nanpercentile(..., 10.0) = 9.9
     white_level = np.nanpercentile(..., 90.0) = 89.1
     """
-    rescaled = rescale_image_to_uint(
-        sample_float_image,
+    config = RescaleConfig(
         percentile_black=10.0,
         percentile_white=90.0,
+        background_color=0,  # Default
         replace_below_black=VAL_BELOW_BLACK,
         replace_above_white=VAL_ABOVE_WHITE,
     )
+    rescaled = rescale_image_to_uint(sample_float_image, config)
     # Value 8.0 (at [0, 8]) is < 9.9, should be replaced with 1
     assert rescaled[0, 8] == VAL_BELOW_BLACK
     # Value 9.0 (at [0, 9]) is < 9.9, should be replaced with 1
@@ -110,8 +118,15 @@ def test_process_and_save_pngs_task_generation():
         tasks_passed_to_map = list(mock_map.call_args[0][1])
         # We expect only ONE task, for the b20_w99 file,
         # because the b10_w99 file was skipped.
-        assert len(tasks_passed_to_map) == 1
-        # Check that the single task has the correct parameters
-        task_params = tasks_passed_to_map[0][0]  # params tuple
-        assert task_params[0] == VAL_PERCENTILE_BLACK  # percentile_black
-        assert task_params[1] == VAL_PERCENTILE_WHITE  # percentile_white
+        task_config_obj = tasks_passed_to_map[0][0]
+        # Check that it is the correct object
+        assert isinstance(task_config_obj, ProcessingConfig)
+        # Access attributes by name, not index
+        assert task_config_obj.percentile_black == VAL_PERCENTILE_BLACK
+        assert task_config_obj.percentile_white == VAL_PERCENTILE_WHITE
+        # --- (Optional) Check other params to be safe ---
+        assert task_config_obj.background_color == 0
+        assert task_config_obj.replace_below_black == 0
+        assert task_config_obj.replace_above_white == VAL_99_PERCENT
+        assert task_config_obj.stretch_function == "AsinhStretch"
+        assert task_config_obj.interval_function == "ZScaleInterval"
