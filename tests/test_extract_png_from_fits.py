@@ -112,9 +112,6 @@ def test_process_and_save_pngs_task_generation():
             overwrite=False,
         )
         # 6. --- Assertions ---
-        # Get the 'tasks_to_run' list passed to mock_map
-        # mock_map.call_args[0] is the tuple of positional args
-        # The second arg (index 1) is the iterable (our task list)
         tasks_passed_to_map = list(mock_map.call_args[0][1])
         # We expect only ONE task, for the b20_w99 file,
         # because the b10_w99 file was skipped.
@@ -124,7 +121,6 @@ def test_process_and_save_pngs_task_generation():
         # Access attributes by name, not index
         assert task_config_obj.percentile_black == VAL_PERCENTILE_BLACK
         assert task_config_obj.percentile_white == VAL_PERCENTILE_WHITE
-        # --- (Optional) Check other params to be safe ---
         assert task_config_obj.background_color == 0
         assert task_config_obj.replace_below_black == 0
         assert task_config_obj.replace_above_white == VAL_99_PERCENT
