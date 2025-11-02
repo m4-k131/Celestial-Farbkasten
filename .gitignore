@@ -9,4 +9,4 @@ __pycache__/*
 *.dat
 *.jpg
 .env
-*.json
+outputs/*

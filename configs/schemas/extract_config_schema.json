@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FITS Extraction Configuration",
+  "description": "Defines a set of FITS files to process and which processing parameters to apply to them.",
+  "type": "object",
+  "properties": {
+    "fits_files": {
+      "description": "A dictionary mapping FITS file paths to their processing settings.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Processing configuration for a single FITS file.",
+        "properties": {
+          "fits_indices": {
+            "description": "List of HDU indices to extract from the FITS file.",
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "minItems": 1
+          },
+          "processing_params": {
+            "description": "List of processing parameter sets. Each item can be a path to a JSON file or an inline parameter grid object.",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "A relative path to a JSON file defining a processing grid.",
+                  "pattern": "^.+\\.json$"
+                },
+                {
+                  "$ref": "#/definitions/processingGrid"
+                }
+              ]
+            },
+            "minItems": 1
+          }
+        },
+        "required": ["fits_indices", "processing_params"]
+      }
+    }
+  },
+  "required": ["fits_files"],
+  "additionalProperties": false,
+
+  "definitions": {
+    "processingGrid": {
+      "type": "object",
+      "description": "An inline grid of processing parameters.",
+      "properties": {
+        "interval_function": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "stretch_function": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "percentile_black": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 100 }
+        },
+        "percentile_white": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 100 }
+        },
+        "background_color": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+        },
+        "replace_below_black": {
+          "type": "array",
+          "items": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "replace_above_white": {
+          "type": "array",
+          "items": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      },
+      "required": [
+        "interval_function",
+        "stretch_function",
+        "percentile_black",
+        "percentile_white",
+        "background_color",
+        "replace_below_black",
+        "replace_above_white"
+      ]
+    }
+  }
+}
