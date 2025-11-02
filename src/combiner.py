@@ -120,7 +120,7 @@ def main(input_json: str, imagename: str | None = None, suffix: str | None = Non
     os.makedirs(outdir, exist_ok=True)
     if imagename is None:
         imagename = f"{os.path.basename(input_json).split('.')[0]}"
-        #print(imagename)
+        # print(imagename)
     finalname = f"{imagename}.png" if suffix is None else f"{imagename}_{suffix}.png"
     i = 0
     while os.path.isfile(os.path.join(outdir, finalname)) and not overwrite:
