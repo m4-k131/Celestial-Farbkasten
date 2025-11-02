@@ -10,7 +10,6 @@ from lib.colors import COLORS
 from paths import COLOR_IMAGE
 
 
-
 def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5, contrast_scale: float = 1.2) -> np.ndarray:
     """Adjusts the saturation and contrast of an image.
     Saturation is adjusted first, then contrast, to prevent color data loss.
