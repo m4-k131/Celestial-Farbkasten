@@ -8,3 +8,4 @@ opencv-python
 shapely
 reproject
 pytest
+matplotlib

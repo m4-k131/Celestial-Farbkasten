@@ -2,10 +2,11 @@
 dev/*
 __pycache__/*
 */__pycache__/*
+*/*/__pycache__/*
 
 *.fits
 *.png
 *.dat
 *.jpg
 .env
-*.json
+outputs/*

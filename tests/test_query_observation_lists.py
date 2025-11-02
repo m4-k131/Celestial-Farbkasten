@@ -1,8 +1,8 @@
 import os
-import pytest
-import pandas as pd
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pandas as pd
+import pytest
 
 from src.query_observation_lists import main as query_main
 

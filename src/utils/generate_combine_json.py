@@ -1,5 +1,5 @@
-import json
 import argparse
+import json
 from pathlib import Path
 
 from lib.colors import PALETTES
