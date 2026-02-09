@@ -5,6 +5,7 @@ import numpy as np
 import shutil
 from src.combiner import main as combiner_main
 
+
 def test_combiner_integration(tmp_path):
     # 1. Setup temporary directory structure
     extract_dir = tmp_path / "extracted"
@@ -29,15 +30,15 @@ def test_combiner_integration(tmp_path):
             "images": [
                 {
                     "path": path_a,
-                    "color": "$StellarCrimson", # (0, 50, 255) in BGR
-                    "factor": 1.0
+                    "color": "$StellarCrimson",  # (0, 50, 255) in BGR
+                    "factor": 1.0,
                 },
                 {
                     "path": path_b,
-                    "color": "$OxygenTeal",    # (160, 180, 40) in BGR
-                    "factor": 0.5
-                }
-            ]
+                    "color": "$OxygenTeal",  # (160, 180, 40) in BGR
+                    "factor": 0.5,
+                },
+            ],
         }
         config_path = tmp_path / "test_combine.json"
         with open(config_path, "w", encoding="utf-8") as f:
