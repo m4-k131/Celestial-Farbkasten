@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Image Combiner Configuration",
+  "description": "Configuration for combining processed PNGs into a final color image.",
+  "$ref": "#/$defs/combineConfig",
+  "$defs": {
+    "combineConfig": {
+      "type": "object",
+      "properties": {
+        "images": {
+          "type": "array",
+          "description": "A list of image layers to combine.",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/nestedConfigInline"
+              },
+              {
+                "$ref": "#/$defs/nestedConfigFile"
+              },
+              {
+                "$ref": "#/$defs/baseImageLayer"
+              }
+            ]
+          }
+        },
+        "post_process": {
+          "$ref": "#/$defs/postProcess"
+        },
+        "combination": {
+          "type": "boolean",
+          "description": "Must be true for an inline nested configuration."
+        }
+      },
+      "required": [
+        "images"
+      ]
+    },
+    "baseImageLayer": {
+      "type": "object",
+      "description": "A single image layer from a PNG file.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the source PNG image.",
+          "pattern": "^(?!.*\\.json$).*$"
+        },
+        "color": {
+          "$ref": "#/$defs/colorDef"
+        },
+        "factor": {
+          "type": "number",
+          "description": "Brightness factor for this layer."
+        }
+      },
+      "required": [
+        "path",
+        "color",
+        "factor"
+      ],
+      "additionalProperties": false
+    },
+    "nestedConfigFile": {
+      "type": "object",
+      "description": "A layer that loads its image from another JSON config file.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to a nested JSON config file.",
+          "pattern": "\\.json$"
+        },
+        "factor": {
+          "type": "number",
+          "description": "Brightness factor for the entire nested group."
+        },
+        "clip": {
+          "type": "boolean",
+          "description": "Whether to clip the nested image's values to [0, 255]."
+        }
+      },
+      "required": [
+        "path",
+        "factor"
+      ],
+      "additionalProperties": false
+    },
+    "nestedConfigInline": {
+      "description": "A nested config defined inline.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/combineConfig"
+        },
+        {
+          "properties": {
+            "combination": {
+              "const": true
+            }
+          },
+          "required": [
+            "combination"
+          ]
+        }
+      ]
+    },
+    "colorDef": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "A named color from the library (e.g., '$CosmicGold')."
+        },
+        {
+          "type": "array",
+          "description": "A BGR color triplet as [B, G, R].",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      ]
+    },
+    "postProcess": {
+      "type": "object",
+      "description": "Optional post-processing adjustments.",
+      "properties": {
+        "saturation": {
+          "type": "number",
+          "description": "Saturation scaling factor."
+        },
+        "contrast": {
+          "type": "number",
+          "description": "Contrast/value scaling factor."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

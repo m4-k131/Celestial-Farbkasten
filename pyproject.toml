@@ -4,7 +4,7 @@ src = ["src"]
 
 # Set to a high number to match your 'disable = line-too-long'
 # This controls the formatter.
-line-length = 1000
+line-length = 250
 
 [tool.ruff.lint]
 # "D" (pydocstyle) and "FIX" (flake8-fixme) have been removed.
@@ -23,11 +23,10 @@ fixable = ["ALL"]
 
 # All "D" and "FIX" rules are removed from ignore, as they are no longer selected.
 ignore = [
-    # --- Original Pylint ignores ---
-    "E501",   # line-too-long
+    #"E501",   # line-too-long
     "I",      # isort (wrong-import-order)
     "BLE001", # broad-exception-caught
-    "PLR0913",# too-many-arguments
-    "PLR0917",# too-many-positional-arguments
+    #"PLR0913",# too-many-arguments
+    #"PLR0917",# too-many-positional-arguments
     "PLR0914",# too-many-locals
 ]
