@@ -1,88 +1,67 @@
-from unittest.mock import patch
-
+import os
+import json
 import cv2
 import numpy as np
-import pytest
+import shutil
+from src.combiner import main as combiner_main
 
-# Assumes pytest.ini is set up with 'pythonpath = src'
-from src.combiner import adjust_saturation_contrast, get_color_image
+def test_combiner_integration(tmp_path):
+    # 1. Setup temporary directory structure
+    extract_dir = tmp_path / "extracted"
+    color_dir = tmp_path / "final_image"
+    os.makedirs(extract_dir, exist_ok=True)
+    os.makedirs(color_dir, exist_ok=True)
 
-# --- Constants for Tests ---
-TEST_COLOR_TUPLE = (100, 50, 20)  # BGR
-TEST_COLOR_NAME = "$TestColor"
-TEST_COLOR_VALUE = (10, 20, 30)  # BGR
+    try:
+        # 2. Create fake "extracted" PNGs (8-bit grayscale)
+        path_a = str(extract_dir / "white_source.png")
+        img_a = np.ones((100, 100), dtype=np.uint8) * 255
+        cv2.imwrite(path_a, img_a)
 
+        path_b = str(extract_dir / "gray_source.png")
+        img_b = np.ones((100, 100), dtype=np.uint8) * 127
+        cv2.imwrite(path_b, img_b)
 
-@pytest.fixture
-def sample_gray_image():
-    """A simple 2x2 grayscale image for testing."""
-    # Values: 0 (black), 255 (white), 127.5 (mid-gray)
-    return np.array([[0, 255], [127.5, 50]], dtype=np.float32)
+        # 3. Create the JSON configuration
+        config = {
+            "operand": "+",
+            "colorspace": "bgr",
+            "images": [
+                {
+                    "path": path_a,
+                    "color": "$StellarCrimson", # (0, 50, 255) in BGR
+                    "factor": 1.0
+                },
+                {
+                    "path": path_b,
+                    "color": "$OxygenTeal",    # (160, 180, 40) in BGR
+                    "factor": 0.5
+                }
+            ]
+        }
+        config_path = tmp_path / "test_combine.json"
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config, f)
 
+        # 4. Run the combiner
+        combiner_main(str(config_path), imagename="test_result", outdir=str(color_dir))
 
-def test_get_color_image_with_tuple(sample_gray_image):
-    """
-    Tests get_color_image with a simple array and a (B, G, R) tuple.
-    """
-    factor = 1.0
-    colored_image = get_color_image(sample_gray_image, TEST_COLOR_TUPLE, factor)
-    # --- Assertions ---
-    assert colored_image.dtype == np.float32
-    assert colored_image.shape == (2, 2, 3)  # Should now have 3 channels
-    # 1. Black (0) should remain black (0, 0, 0)
-    expected_black = [0.0, 0.0, 0.0]
-    assert np.allclose(colored_image[0, 0], expected_black)
-    # 2. White (255) should become the full color
-    expected_white = [100.0, 50.0, 20.0]  # TEST_COLOR_TUPLE
-    assert np.allclose(colored_image[0, 1], expected_white)
-    # 3. Mid-gray (127.5) should be 50% of the color
-    # 127.5 / 255.0 = 0.5
-    expected_mid = [50.0, 25.0, 10.0]  # 0.5 * TEST_COLOR_TUPLE
-    assert np.allclose(colored_image[1, 0], expected_mid)
+        # 5. Verify the output
+        result_path = color_dir / "test_result.png"
+        assert os.path.exists(result_path)
 
+        result_img = cv2.imread(str(result_path))
+        # Calculate expected values
+        # B: 0 + (0.5 * (127/255) * 160) ≈ 40
+        # G: 50 + (0.5 * (127/255) * 180) ≈ 95
+        # R: 255 + (0.5 * (127/255) * 40) ≈ 255 (clipped)
+        avg_bgr = np.mean(result_img, axis=(0, 1))
+        assert np.isclose(avg_bgr[0], 40, atol=1)
+        assert np.isclose(avg_bgr[1], 95, atol=1)
+        assert np.isclose(avg_bgr[2], 255, atol=1)
 
-def test_get_color_image_with_factor(sample_gray_image):
-    """
-    Tests that the 'factor' correctly scales the output.
-    """
-    factor = 0.5
-    colored_image = get_color_image(sample_gray_image, TEST_COLOR_TUPLE, factor)
-    # --- Assertions ---
-    # White (255) should now be 50% of the full color
-    # 1.0 * (100, 50, 20) * 0.5
-    expected_white_factored = [50.0, 25.0, 10.0]
-    assert np.allclose(colored_image[0, 1], expected_white_factored)
-
-
-@patch("src.combiner.COLORS", {TEST_COLOR_NAME: TEST_COLOR_VALUE})
-def test_get_color_image_with_string(sample_gray_image):
-    """
-    Tests that a color string is correctly looked up from the COLORS dict.
-    We patch the dict to avoid depending on the real values.
-    """
-    colored_image = get_color_image(sample_gray_image, TEST_COLOR_NAME, factor=1.0)
-    # --- Assertions ---
-    # White (255) should become the full TEST_COLOR_VALUE
-    expected_color = [10.0, 20.0, 30.0]
-    assert np.allclose(colored_image[0, 1], expected_color)
-
-
-def test_adjust_saturation_contrast():
-    """
-    Tests that saturation and contrast are increased.
-    """
-    # A simple BGR image (a dull red)
-    original_bgr = np.array([[[100, 100, 200]]], dtype=np.uint8)
-    # Convert to HSV to get base values
-    original_hsv = cv2.cvtColor(original_bgr, cv2.COLOR_BGR2HSV)
-    original_s = original_hsv[0, 0, 1]
-    original_v = original_hsv[0, 0, 2]
-    # --- Run the function ---
-    adjusted_image = adjust_saturation_contrast(original_bgr, saturation_scale=1.5, contrast_scale=1.2)
-    # --- Assertions ---
-    adjusted_hsv = cv2.cvtColor(adjusted_image, cv2.COLOR_BGR2HSV)
-    adjusted_s = adjusted_hsv[0, 0, 1]
-    adjusted_v = adjusted_hsv[0, 0, 2]
-
-    assert adjusted_s > original_s
-    assert adjusted_v > original_v
+    finally:
+        # 6. Explicit Cleanup
+        # Deletes the entire temporary tree created during this test
+        if os.path.exists(tmp_path):
+            shutil.rmtree(tmp_path)
