@@ -15,7 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        # We must check out the specific branch name to be able to push
         ref: ${{ github.ref_name }}
         
     - name: Set up Python ${{ matrix.python-version }}
