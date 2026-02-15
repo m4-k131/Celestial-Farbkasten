@@ -5,8 +5,8 @@ import json
 import os
 import warnings
 from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import shared_memory
 from dataclasses import dataclass
+from multiprocessing import shared_memory
 from typing import Optional, Tuple
 
 import astropy
@@ -60,6 +60,7 @@ class RescaleConfig:
     background_color: int = 0
     replace_below_black: int | None = None
     replace_above_white: int | None = None
+    mirror_white_overflow: bool = False
 
 
 @dataclass
@@ -73,6 +74,7 @@ class ProcessingConfig:
     replace_above_white: Optional[int]
     stretch_function: str
     interval_function: str
+    mirror_white_overflow: bool
 
 
 def unpack_and_run_worker(worker_args: Tuple[ProcessingConfig, str, str, tuple, np.dtype]) -> Optional[Exception]:
@@ -126,6 +128,13 @@ def rescale_image_to_uint(source_data: np.ndarray, config: RescaleConfig) -> np.
 
     np.subtract(source_data, black_level, out=temp_float)
     np.divide(temp_float, denominator, out=temp_float)
+    if getattr(config, "mirror_white_overflow", False):
+        over_white_mask = temp_float > 1.0
+        # In-place reflection: 2.0 - Value
+        temp_float[over_white_mask] = 2.0 - temp_float[over_white_mask]
+        # Clip values that reflected so far they went below 0 (originally > 2.0)
+        # This effectively fades bright cores to black.
+        np.clip(temp_float, 0, None, out=temp_float)
     np.multiply(temp_float, 255, out=temp_float)
     np.clip(temp_float, 0, 255, out=temp_float)
     np.nan_to_num(temp_float, copy=False, nan=config.background_color)
@@ -135,7 +144,7 @@ def rescale_image_to_uint(source_data: np.ndarray, config: RescaleConfig) -> np.
     if config.replace_below_black is not None:
         below_mask = (~nan_mask) & (source_data < black_level)
         uint8_image[below_mask] = config.replace_below_black
-    if config.replace_above_white is not None:
+    if config.replace_above_white is not None and not getattr(config, "mirror_white_overflow", False):
         above_mask = source_data > white_level
         uint8_image[above_mask] = config.replace_above_white
     uint8_image[nan_mask] = config.background_color
@@ -155,7 +164,12 @@ def process_data(raw_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
     normalized_data = get_normalized_images(raw_data, config.stretch_function, config.interval_function)
     normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
     rescale_cfg = RescaleConfig(
-        percentile_black=config.percentile_black, percentile_white=config.percentile_white, background_color=config.background_color, replace_below_black=config.replace_below_black, replace_above_white=config.replace_above_white
+        percentile_black=config.percentile_black,
+        percentile_white=config.percentile_white,
+        background_color=config.background_color,
+        replace_below_black=config.replace_below_black,
+        replace_above_white=config.replace_above_white,
+        mirror_white_overflow=config.mirror_white_overflow,
     )
     rescaled_image = rescale_image_to_uint(normalized_data, rescale_cfg)
     return rescaled_image
@@ -349,6 +363,7 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
             if not isinstance(loaded_param_set, dict):
                 print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
                 continue
+            mirror_options = loaded_param_set.get("mirror_white_overflow", [False])
             all_params = itertools.product(
                 loaded_param_set["percentile_black"],
                 loaded_param_set["percentile_white"],
@@ -357,14 +372,18 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
                 loaded_param_set["replace_above_white"],
                 loaded_param_set["stretch_function"],
                 loaded_param_set["interval_function"],
+                mirror_options,
             )
             valid_params = [p for p in all_params if p[1] > p[0]]  # p[1] is p_w, p[0] is p_b
             # print(valid_params, valid_params)
             tasks_to_run = []
             for params_tuple in valid_params:
-                p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn = params_tuple
-                config = ProcessingConfig(percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn)
-                filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
+                p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
+                config = ProcessingConfig(
+                    percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool
+                )
+                suffix = "_mir" if mirror_bool else ""
+                filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}{suffix}.png"
                 full_outpath = os.path.join(output_dir, filename)
                 if overwrite or not os.path.exists(full_outpath):
                     tasks_to_run.append((config, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
