@@ -139,4 +139,4 @@ if __name__ == "__main__":
     parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
-    main(args.input_json, args.imagename, args.suffix, args.outdir)
+    main(args.input_json, args.imagename, args.suffix, args.outdir, args.overwrite)
