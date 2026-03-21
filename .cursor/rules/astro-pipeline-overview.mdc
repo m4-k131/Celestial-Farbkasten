@@ -1,0 +1,32 @@
+---
+description: End-to-end FITS → false-color pipeline, layout, and how to run it
+alwaysApply: true
+---
+
+# Astro project — pipeline overview
+
+This repo turns archive telescope FITS (primarily exercised on **JWST** via **MAST**) into **false-color composites**: query observations, download products, extract aligned 8-bit PNGs with chosen stretches, then blend PNGs with named or raw BGR colors.
+
+## Pipeline order (do not reorder casually)
+
+1. **`src/query_observation_lists.py`** — `astroquery.mast.Observations.query_criteria`; writes a pandas CSV under `outputs/csv/` (default). Requires **`MAST_API_TOKEN`** (env or `.env`); optional `--exact_name`, `--calib_level`, `--project` (default JWST).
+2. **`src/download_from_csv.py`** — reads CSV, filters `intentType == "science"`, downloads JPG/FITS via MAST download URLs into `outputs/download/<csv_basename>/`. Use `--must_contain` to subset files without re-querying; `--ignore_fits` / `--ignore_jpgs` to limit volume.
+3. **`src/extract_png_from_fits.py`** — JSON-driven: WCS/reprojection, optional cross-image matching, Astropy `ImageNormalize` (stretch + interval from string keys), rescale to PNG. Heavy use of **`reproject`**, **`skimage`**, **`ProcessPoolExecutor`** + **`shared_memory`**. Default PNG root: `outputs/extracted_png` via `paths.py`.
+4. **`src/combiner.py`** — JSON-driven: loads grayscale PNGs, tints by **`lib/colors.COLORS`** or raw BGR triples, sums layers (`operand` typically `"+"`), optional `clip` and `post_process` (HSV saturation/contrast). Writes PNG + sidecar JSON under `outputs/color_image` by default.
+
+## Repo map
+
+| Area | Role |
+|------|------|
+| `src/paths.py` | `PROJECT_ROOT`, `OUTPUT_DIR`, `CSV_DIR`, `DOWNLOAD_DIR`, `EXTRACTED_PNG_DIR`, `COLOR_IMAGE` |
+| `src/lib/colors.py` | Named BGR tuples + **`PALETTES`** (JWST filter–oriented preset lists) |
+| `src/utils/generate_extract_json.py` | Scaffold extract/combine JSON from folders (defaults reference `configs/extract/...`) |
+| `src/utils/generate_combine_json.py` | Build combiner JSONs from **`PALETTES`** and extracted PNG folder names |
+| `src/utils/image_utils.py` | Shared image helpers for extraction path |
+| `tests/` | Integration + unit tests around download, query, extract, combiner |
+
+## Agent reminders
+
+- Run CLIs from repo root as **`python src/<script>.py`** so imports resolve (`paths`, `lib.colors`, etc.).
+- **README** may show `combiner.py` without `src/`; the implemented entry point is **`src/combiner.py`**.
+- Extract/combine behavior is **configuration-first**: prefer extending JSON schemas and small code hooks over hard-coding new object names in Python.
