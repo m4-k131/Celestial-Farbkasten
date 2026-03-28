@@ -3,12 +3,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from src.extract_png_from_fits import (
-    process_and_save_pngs,
-    rescale_image_to_uint,
-    RescaleConfig,
-    ProcessingConfig,  # Assuming you created this dataclass as we discussed
-)
+from extract_png_from_fits import ProcessingConfig, process_and_save_pngs
+from lib.extract_png_worker import RescaleConfig, rescale_image_to_uint
 
 VAL_0_PERCENT = 0
 VAL_99_PERCENT = 255
@@ -88,12 +84,12 @@ def test_process_and_save_pngs_task_generation():
     test_outdir = "fake/output/dir"
 
     with (
-        patch("src.extract_png_from_fits.shared_memory.SharedMemory"),
-        patch("src.extract_png_from_fits.np.ndarray"),
-        patch("src.extract_png_from_fits.ProcessPoolExecutor") as mock_executor,
-        patch("src.extract_png_from_fits.os.path.exists") as mock_exists,
+        patch("extract_png_from_fits.shared_memory.SharedMemory"),
+        patch("extract_png_from_fits.np.ndarray"),
+        patch("extract_png_from_fits.ProcessPoolExecutor") as mock_executor,
+        patch("extract_png_from_fits.os.path.exists") as mock_exists,
         patch("builtins.open"),
-        patch("src.extract_png_from_fits.json.load", return_value=mock_params),
+        patch("extract_png_from_fits.json.load", return_value=mock_params),
     ):
         # Let's pretend the first file (b10_w99...) already exists
         # and the second one (b20_w99...) does not.

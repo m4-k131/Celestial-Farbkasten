@@ -3,17 +3,12 @@ import gc
 import itertools
 import json
 import os
-import warnings
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from multiprocessing import shared_memory
-from typing import Optional, Tuple
 
-import astropy
-import cv2
 import numpy as np
 from astropy.io import fits
-from astropy.visualization import ImageNormalize
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from reproject import reproject_interp
@@ -21,28 +16,8 @@ from shapely.geometry import Polygon
 from skimage.transform import AffineTransform, warp
 from tqdm import tqdm
 
+from lib.extract_png_worker import ProcessingConfig, unpack_and_run_worker
 from paths import EXTRACTED_PNG_DIR
-
-STRETCH_FUNCTIONS = {
-    "BaseStretch": astropy.visualization.stretch.BaseStretch,
-    "LinearStretch": astropy.visualization.stretch.LinearStretch,
-    "SqrtStretch": astropy.visualization.stretch.SqrtStretch,
-    "PowerStretch": astropy.visualization.stretch.PowerStretch,
-    "PowerDistStretch": astropy.visualization.stretch.PowerDistStretch,
-    "SquaredStretch": astropy.visualization.stretch.SquaredStretch,
-    "LogStretch": astropy.visualization.stretch.LogStretch,
-    "AsinhStretch": astropy.visualization.stretch.AsinhStretch,
-    "SinhStretch": astropy.visualization.stretch.SinhStretch,
-    "HistEqStretch": astropy.visualization.stretch.HistEqStretch,
-    "ContrastBiasStretch": astropy.visualization.stretch.ContrastBiasStretch,
-}
-
-INTERVAL_FUNCTIONS = {
-    "ManualInterval": astropy.visualization.interval.ManualInterval,
-    "MinMaxInterval": astropy.visualization.interval.MinMaxInterval,
-    "AsymmetricPercentileInterval": astropy.visualization.interval.AsymmetricPercentileInterval,
-    "ZScaleInterval": astropy.visualization.interval.ZScaleInterval,
-}
 
 DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_points": 150}
 
@@ -51,42 +26,6 @@ DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_p
 class NormalizeConfig:
     stretch_function: str = "AsinhStretch"
     interval_function: str = "ZScaleInterval"
-
-
-@dataclass
-class RescaleConfig:
-    percentile_black: float = 0.1
-    percentile_white: float = 0.9
-    background_color: int = 0
-    replace_below_black: int | None = None
-    replace_above_white: int | None = None
-    mirror_white_overflow: bool = False
-
-
-@dataclass
-class ProcessingConfig:
-    """Holds all parameters for a single image processing variant."""
-
-    percentile_black: float
-    percentile_white: float
-    background_color: int
-    replace_below_black: Optional[int]
-    replace_above_white: Optional[int]
-    stretch_function: str
-    interval_function: str
-    mirror_white_overflow: bool
-
-
-def unpack_and_run_worker(worker_args: Tuple[ProcessingConfig, str, str, tuple, np.dtype]) -> Optional[Exception]:
-    """Helper function to unpack arguments and call the main worker."""
-    config = worker_args[0]
-    output_dir = worker_args[1]
-    shm_name, shape, dtype = worker_args[-3:]
-    existing_shm = shared_memory.SharedMemory(name=shm_name)
-    data_to_process = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
-    result = _worker(config, output_dir, data_to_process)
-    existing_shm.close()
-    return result
 
 
 def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
@@ -99,80 +38,10 @@ def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
     return np.ascontiguousarray(data)
 
 
-def get_normalized_images(data, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
-    if stretch_function not in STRETCH_FUNCTIONS:
-        print(f"{interval_function=} is not a valid stretch function. Available stretch functions are: {STRETCH_FUNCTIONS.keys()}. Using default AsinhStretch")
-        stretch_function = "AsinhStretch"
-    if interval_function not in INTERVAL_FUNCTIONS:
-        print(f"{interval_function=} is not a valid interval function. Available interval functions are: {INTERVAL_FUNCTIONS.keys()}. Using default ZScaleInterval")
-        interval_function = "ZScaleInterval"
-    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[interval_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
-    return norm(data)
-
-
-def rescale_image_to_uint(source_data: np.ndarray, config: RescaleConfig) -> np.ndarray:
-    """Rescales a float image to uint8, with options to replace out-of-band values."""
-    nan_mask = np.isnan(source_data)
-    with warnings.catch_warnings():  # Afaik ignoring the masked values is what we want
-        warnings.filterwarnings("ignore", message=".*'partition' will ignore the 'mask' of the MaskedArray.*")
-        black_level = np.nanpercentile(source_data, config.percentile_black)
-        white_level = np.nanpercentile(source_data, config.percentile_white)
-    if white_level <= black_level:
-        uint8_image = np.full(source_data.shape, config.background_color, dtype=np.uint8)
-        return uint8_image
-    temp_float = np.empty(source_data.shape, dtype=np.float32)
-    # Perform all arithmetic and clipping operations in-place on the temp array.
-    denominator = white_level - black_level
-    if denominator == 0:
-        denominator = 1
-
-    np.subtract(source_data, black_level, out=temp_float)
-    np.divide(temp_float, denominator, out=temp_float)
-    if getattr(config, "mirror_white_overflow", False):
-        over_white_mask = temp_float > 1.0
-        # In-place reflection: 2.0 - Value
-        temp_float[over_white_mask] = 2.0 - temp_float[over_white_mask]
-        # Clip values that reflected so far they went below 0 (originally > 2.0)
-        # This effectively fades bright cores to black.
-        np.clip(temp_float, 0, None, out=temp_float)
-    np.multiply(temp_float, 255, out=temp_float)
-    np.clip(temp_float, 0, 255, out=temp_float)
-    np.nan_to_num(temp_float, copy=False, nan=config.background_color)
-    uint8_image = temp_float.astype(np.uint8)
-    del temp_float
-
-    if config.replace_below_black is not None:
-        below_mask = (~nan_mask) & (source_data < black_level)
-        uint8_image[below_mask] = config.replace_below_black
-    if config.replace_above_white is not None and not getattr(config, "mirror_white_overflow", False):
-        above_mask = source_data > white_level
-        uint8_image[above_mask] = config.replace_above_white
-    uint8_image[nan_mask] = config.background_color
-    return uint8_image
-
-
 def apply_transormation(source_data, transformation_params, output_shape):  # ???
     tform = AffineTransform(matrix=transformation_params)
     transformed_data = warp(source_data, inverse_map=tform.inverse, preserve_range=True, output_shape=output_shape, cval=0)
     return transformed_data
-
-
-def process_data(raw_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
-    """
-    Applies normalization and rescaling to raw FITS data based on a config.
-    """
-    normalized_data = get_normalized_images(raw_data, config.stretch_function, config.interval_function)
-    normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
-    rescale_cfg = RescaleConfig(
-        percentile_black=config.percentile_black,
-        percentile_white=config.percentile_white,
-        background_color=config.background_color,
-        replace_below_black=config.replace_below_black,
-        replace_above_white=config.replace_above_white,
-        mirror_white_overflow=config.mirror_white_overflow,
-    )
-    rescaled_image = rescale_image_to_uint(normalized_data, rescale_cfg)
-    return rescaled_image
 
 
 def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
@@ -324,22 +193,6 @@ def find_best_reference_image(transformations):  # np.ndarray?
     return best_reference
 
 
-def _worker(config: ProcessingConfig, output_dir: str, data_to_process: np.ndarray) -> None | Exception:
-    """
-    A single unit of work. Processes and saves one image based on a ProcessingConfig.
-    """
-    try:
-        filename = f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_{config.stretch_function[:-7]}_{config.interval_function[:-8]}.png"
-        full_outpath = os.path.join(output_dir, filename)
-        if not os.path.exists(full_outpath):
-            processed_data = process_data(data_to_process, config)
-            cv2.imwrite(full_outpath, processed_data)
-        return None  # Indicate success
-    except Exception as e:
-        print(f"Failed on config {config}: {e}")
-        return e
-
-
 def process_and_save_pngs(data_to_process, processing_params: str | dict, output_dir: str, overwrite: bool = False) -> None:
     """Takes a single FITS data array and generates all specified PNG variants.
 
@@ -379,6 +232,8 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
             tasks_to_run = []
             for params_tuple in valid_params:
                 p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
+                if mirror_bool and p_w == 100:
+                    continue
                 config = ProcessingConfig(
                     percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool
                 )
