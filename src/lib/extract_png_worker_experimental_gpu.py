@@ -10,10 +10,7 @@ import numpy as np
 try:
     import tensorflow as tf
 except ImportError as e:
-    raise ImportError(
-        "TensorFlow failed to import (pip install -r requirements_experimental_gpu.txt; on Windows ensure MSVC runtime / compatible CPU). "
-        f"Original: {e!r}"
-    ) from e
+    raise ImportError(f"TensorFlow failed to import (pip install -r requirements_experimental_gpu.txt; on Windows ensure MSVC runtime / compatible CPU). Original: {e!r}") from e
 
 from lib.extract_png_worker import ProcessingConfig, RescaleConfig, get_normalized_images
 
