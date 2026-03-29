@@ -1,11 +1,12 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Optional
 
 from lib.colors import PALETTES
 
 
-def get_wavelength_from_folder(folder_name: str) -> str | None:
+def get_wavelength_from_folder(folder_name: str) -> Optional[str]:
     """Extracts the wavelength string from a folder name."""
     try:
         return folder_name.split("_")[-2]

@@ -1,5 +1,6 @@
 import argparse
 from dataclasses import dataclass
+from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -9,14 +10,14 @@ import numpy as np
 class CropConfig:
     """Holds all parameters for a crop and resize operation."""
 
-    bottom_y: float | int = 1.0
-    top_left: tuple[int, int] = (0, 0)
-    target_resolution: tuple[int, int] = (3440, 1440)
+    bottom_y: Union[float, int] = 1.0
+    top_left: Tuple[int, int] = (0, 0)
+    target_resolution: Tuple[int, int] = (3440, 1440)
     crop_by_target_size: bool = False
     autofit: bool = False
 
 
-def max_centered_crop_dims(img_w: int, img_h: int, target_w: int, target_h: int) -> tuple[int, int, int, int]:
+def max_centered_crop_dims(img_w: int, img_h: int, target_w: int, target_h: int) -> Tuple[int, int, int, int]:
     """Largest crop inside the image with aspect target_w:target_h; returns (top_y, top_x, cw, ch)."""
     ar = target_w / target_h
     iw_over_ih = img_w / img_h
@@ -37,7 +38,7 @@ def max_centered_crop_dims(img_w: int, img_h: int, target_w: int, target_h: int)
     return top_y, top_x, cw, ch
 
 
-def crop_and_resize(image: np.ndarray, config: CropConfig) -> np.ndarray | None:
+def crop_and_resize(image: np.ndarray, config: CropConfig) -> Optional[np.ndarray]:
     """Crops and resizes an image, maintaining the target aspect ratio.
 
     Args:
@@ -46,14 +47,14 @@ def crop_and_resize(image: np.ndarray, config: CropConfig) -> np.ndarray | None:
                           - If > 1.0, it's treated as an ABSOLUTE y-pixel coordinate.
                           - If <= 1.0, it's treated as a RELATIVE position (percentage of image height).
                           Only used when crop_by_target_size is False.
-        top_left (tuple[int, int]): The (y, x) coordinates for the top-left of the crop.
-        target_resolution (tuple[int, int]): The final (width, height) of the output image.
+        top_left (Tuple[int, int]): The (y, x) coordinates for the top-left of the crop.
+        target_resolution (Tuple[int, int]): The final (width, height) of the output image.
         crop_by_target_size (bool): If True, crops a window with the exact dimensions of
                                     target_resolution. If False, calculates the crop window
                                     based on bottom_y and the target aspect ratio.
 
     Returns:
-        np.ndarray | None: The processed image, or None if the crop is invalid.
+        Optional[np.ndarray]: The processed image, or None if the crop is invalid.
 
     """
     img_h, img_w = image.shape[:2]

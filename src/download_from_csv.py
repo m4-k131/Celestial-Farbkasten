@@ -1,5 +1,6 @@
 import argparse
 import os
+from typing import Optional
 
 import pandas as pd
 import requests
@@ -37,7 +38,7 @@ def download_with_tqdm(url: str, local_filename: str) -> bool:
     return True
 
 
-def main(csv: str, download_jpgs: bool = True, download_fits: bool = True, outdir: str | None = None, must_contain: str | None = None) -> None:
+def main(csv: str, download_jpgs: bool = True, download_fits: bool = True, outdir: Optional[str] = None, must_contain: Optional[str] = None) -> None:
     if outdir is None:
         outdir = DOWNLOAD_DIR / os.path.basename(csv)[:-4]
     os.makedirs(outdir, exist_ok=True)

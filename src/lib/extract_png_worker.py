@@ -38,8 +38,8 @@ class RescaleConfig:
     percentile_black: float = 0.1
     percentile_white: float = 0.9
     background_color: int = 0
-    replace_below_black: int | None = None
-    replace_above_white: int | None = None
+    replace_below_black: Optional[int] = None
+    replace_above_white: Optional[int] = None
     mirror_white_overflow: bool = False
 
 
@@ -127,6 +127,12 @@ def process_data(raw_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
     """
     normalized_data = get_normalized_images(raw_data, config.stretch_function, config.interval_function)
     normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
+    return process_data_from_normalized(normalized_data, config)
+
+
+def process_data_from_normalized(normalized_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
+    """Rescale only; caller must run `get_normalized_images` for this (stretch, interval) pair."""
+    normalized_data = normalized_data.astype(np.float32)
     rescale_cfg = RescaleConfig(
         percentile_black=config.percentile_black,
         percentile_white=config.percentile_white,
@@ -135,11 +141,10 @@ def process_data(raw_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
         replace_above_white=config.replace_above_white,
         mirror_white_overflow=config.mirror_white_overflow,
     )
-    rescaled_image = rescale_image_to_uint(normalized_data, rescale_cfg)
-    return rescaled_image
+    return rescale_image_to_uint(normalized_data, rescale_cfg)
 
 
-def _worker(config: ProcessingConfig, output_dir: str, data_to_process: np.ndarray) -> None | Exception:
+def _worker(config: ProcessingConfig, output_dir: str, data_to_process: np.ndarray) -> Optional[Exception]:
     """
     A single unit of work. Processes and saves one image based on a ProcessingConfig.
     """
@@ -151,6 +156,32 @@ def _worker(config: ProcessingConfig, output_dir: str, data_to_process: np.ndarr
             processed_data = process_data(data_to_process, config)
             cv2.imwrite(full_outpath, processed_data)
         return None  # Indicate success
+    except Exception as e:
+        print(f"Failed on config {config}: {e}")
+        return e
+
+
+def unpack_and_run_worker_from_normalized(worker_args: Tuple[ProcessingConfig, str, str, tuple, np.dtype]) -> Optional[Exception]:
+    """Worker entry when shared memory holds float32 `get_normalized_images` output (not raw FITS)."""
+    config = worker_args[0]
+    output_dir = worker_args[1]
+    shm_name, shape, dtype = worker_args[-3:]
+    existing_shm = shared_memory.SharedMemory(name=shm_name)
+    normalized_data = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
+    result = _worker_from_normalized(config, output_dir, normalized_data)
+    existing_shm.close()
+    return result
+
+
+def _worker_from_normalized(config: ProcessingConfig, output_dir: str, normalized_data: np.ndarray) -> Optional[Exception]:
+    try:
+        mir_suffix = "_mir" if config.mirror_white_overflow else ""
+        filename = f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_{config.stretch_function[:-7]}_{config.interval_function[:-8]}{mir_suffix}.png"
+        full_outpath = os.path.join(output_dir, filename)
+        if not os.path.exists(full_outpath):
+            processed_data = process_data_from_normalized(normalized_data, config)
+            cv2.imwrite(full_outpath, processed_data)
+        return None
     except Exception as e:
         print(f"Failed on config {config}: {e}")
         return e

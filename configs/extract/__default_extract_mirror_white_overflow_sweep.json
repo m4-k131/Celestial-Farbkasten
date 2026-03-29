@@ -21,10 +21,11 @@
         99,
         99.5,
         99.7,
+        99.85,
         100
     ],
     "background_color": [
-        255
+        0, 255
     ],
     "replace_below_black": [
         0

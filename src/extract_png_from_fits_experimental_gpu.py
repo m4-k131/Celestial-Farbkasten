@@ -1,10 +1,18 @@
-"""Experimental entry: PNG variants via TensorFlow GPU rescale/encode (single-process; no ProcessPoolExecutor)."""
+"""Experimental entry: PNG variants via TensorFlow GPU rescale/encode (single-process; no ProcessPoolExecutor).
+
+Why GPU usage stays low: Astropy ImageNormalize + ZScale (CPU) dominates wall time; TF only runs cheap
+elementwise rescale + PNG encode. The CPU pipeline uses ProcessPoolExecutor across cores; this path is
+single-process. We cache one normalized float32 image per (stretch_function, interval_function) so
+sweeps over percentiles/mirror do not repeat ImageNormalize.
+"""
 
 import argparse
 import gc
 import itertools
 import json
 import os
+from collections import defaultdict
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from astropy.io import fits
@@ -12,12 +20,12 @@ from reproject import reproject_interp
 from tqdm import tqdm
 
 from extract_png_from_fits import load_fits_data, setup_alignment_reference
-from lib.extract_png_worker import ProcessingConfig
+from lib.extract_png_worker import ProcessingConfig, get_normalized_images
 from lib.extract_png_worker_experimental_gpu import run_single_png_task_gpu
 from paths import EXTRACTED_PNG_DIR
 
 
-def process_and_save_pngs_experimental_gpu(data_to_process: np.ndarray, processing_params: str | dict, output_dir: str, overwrite: bool = False) -> None:
+def process_and_save_pngs_experimental_gpu(data_to_process: np.ndarray, processing_params: Union[str, dict], output_dir: str, overwrite: bool = False) -> None:
     for param_item in processing_params:
         print(param_item)
         loaded_param_set = param_item
@@ -39,7 +47,7 @@ def process_and_save_pngs_experimental_gpu(data_to_process: np.ndarray, processi
             mirror_options,
         )
         valid_params = [p for p in all_params if p[1] > p[0]]
-        tasks_to_run: list[ProcessingConfig] = []
+        tasks_to_run: List[ProcessingConfig] = []
         for params_tuple in valid_params:
             p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
             if mirror_bool and p_w == 100:
@@ -62,11 +70,19 @@ def process_and_save_pngs_experimental_gpu(data_to_process: np.ndarray, processi
         if not tasks_to_run:
             print("   -> All PNGs already exist. Skipping generation.")
             continue
-        for config in tqdm(tasks_to_run, desc="   -> Generating PNGs (TF experimental GPU)"):
-            run_single_png_task_gpu(config, output_dir, data_to_process)
+        by_stretch_interval: dict[Tuple[str, str], List[ProcessingConfig]] = defaultdict(list)
+        for cfg in tasks_to_run:
+            by_stretch_interval[(cfg.stretch_function, cfg.interval_function)].append(cfg)
+        tasks_with_norm: list[tuple[ProcessingConfig, np.ndarray]] = []
+        for (stretch_fn, interval_fn), group_cfgs in by_stretch_interval.items():
+            normalized_float32 = get_normalized_images(data_to_process, stretch_fn, interval_fn).astype(np.float32)
+            for cfg in group_cfgs:
+                tasks_with_norm.append((cfg, normalized_float32))
+        for config, normalized_float32 in tqdm(tasks_with_norm, desc="   -> Generating PNGs (TF experimental GPU)"):
+            run_single_png_task_gpu(config, output_dir, data_to_process, normalized_float32=normalized_float32)
 
 
-def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: str | None = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: Optional[str] = None, no_matching: bool = False, overwrite: bool = False) -> None:
     if outpath is None:
         outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)
@@ -100,7 +116,7 @@ def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: str 
     print("\nProcessing complete.")
 
 
-def main(input_json: str, outdir: str | None = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def main(input_json: str, outdir: Optional[str] = None, no_matching: bool = False, overwrite: bool = False) -> None:
     with open(input_json, encoding="utf-8") as f:
         dict_to_process = json.load(f)
     process_dictionary_wcs_experimental_gpu(dict_to_process, outdir, no_matching, overwrite)

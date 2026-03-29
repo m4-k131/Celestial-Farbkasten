@@ -6,6 +6,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from multiprocessing import shared_memory
+from typing import Optional, Union
 
 import numpy as np
 from astropy.io import fits
@@ -44,7 +45,7 @@ def apply_transormation(source_data, transformation_params, output_shape):  # ??
     return transformed_data
 
 
-def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
+def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Optional[Polygon]:
     """Helper function to get the sky footprint of a FITS file as a Shapely Polygon."""
     try:
         with fits.open(filepath) as hdul:
@@ -57,7 +58,7 @@ def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
         return None
 
 
-def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> str | None:
+def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> Optional[str]:
     """Finds the optimal reference image by first identifying the highest resolution group,
     then finding the image with the best geometric overlap within that group.
 
@@ -193,7 +194,7 @@ def find_best_reference_image(transformations):  # np.ndarray?
     return best_reference
 
 
-def process_and_save_pngs(data_to_process, processing_params: str | dict, output_dir: str, overwrite: bool = False) -> None:
+def process_and_save_pngs(data_to_process, processing_params: Union[str, dict], output_dir: str, overwrite: bool = False) -> None:
     """Takes a single FITS data array and generates all specified PNG variants.
 
     Args:
@@ -252,7 +253,7 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
         shm.unlink()
 
 
-def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def process_dictionary_wcs(dict_to_process: dict, outpath: Optional[str] = None, no_matching: bool = False, overwrite: bool = False) -> None:
     """Processes a dictionary of FITS files, aligning them using WCS and generating PNGs."""
     if outpath is None:
         outpath = EXTRACTED_PNG_DIR
@@ -287,7 +288,7 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no
     print("\nProcessing complete.")
 
 
-def main(input_json: str, outdir: str | None = None, no_matching: bool = False, overwrite: bool = False):
+def main(input_json: str, outdir: Optional[str] = None, no_matching: bool = False, overwrite: bool = False):
     with open(input_json, "r", encoding="utf-8") as f:
         dict_to_process = json.load(f)
     process_dictionary_wcs(dict_to_process, outdir, no_matching, overwrite)

@@ -1,6 +1,7 @@
 import argparse
 import os
 from getpass import getpass
+from typing import Optional
 
 from astroquery.mast import Observations
 from dotenv import load_dotenv
@@ -10,7 +11,7 @@ from paths import CSV_DIR
 # pylint:disable=no-member
 
 
-def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, project: str = "JWST", outdir: str | None = None) -> None:
+def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, project: str = "JWST", outdir: Optional[str] = None) -> None:
     load_dotenv()
     api_token = os.getenv("MAST_API_TOKEN")
     if api_token is None:
