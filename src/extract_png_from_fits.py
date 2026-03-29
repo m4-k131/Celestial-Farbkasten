@@ -241,9 +241,7 @@ def process_and_save_pngs(
             p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
             if mirror_bool and p_w == 100:
                 continue
-            config = ProcessingConfig(
-                percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool
-            )
+            config = ProcessingConfig(percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool)
             suffix = "_mir" if mirror_bool else ""
             filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}{suffix}.png"
             full_outpath = os.path.join(output_dir, filename)

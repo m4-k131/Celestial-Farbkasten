@@ -22,7 +22,6 @@ class BenchmarkRow:
     detail: str = ""
 
 
-
 class ExtractBenchmark:
     """Collects named intervals (seconds) and writes a text report."""
 

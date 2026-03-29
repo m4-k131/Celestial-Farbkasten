@@ -168,10 +168,7 @@ def write_png_tf(path: str, gray_uint8: np.ndarray) -> None:
 
 def gpu_png_output_path(config: ProcessingConfig, output_dir: str) -> str:
     mir_suffix = "_mir" if config.mirror_white_overflow else ""
-    filename = (
-        f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_"
-        f"{config.stretch_function[:-7]}_{config.interval_function[:-8]}{mir_suffix}.png"
-    )
+    filename = f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_{config.stretch_function[:-7]}_{config.interval_function[:-8]}{mir_suffix}.png"
     return os.path.join(output_dir, filename)
 
 
