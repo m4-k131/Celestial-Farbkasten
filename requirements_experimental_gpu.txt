@@ -1,0 +1,2 @@
+# Optional: TensorFlow for src/lib/extract_png_worker_experimental_gpu.py and src/extract_png_from_fits_experimental_gpu.py
+tensorflow>=2.14

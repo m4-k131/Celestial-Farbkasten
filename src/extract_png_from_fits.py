@@ -1,19 +1,19 @@
 import argparse
+import contextlib
 import gc
 import itertools
 import json
 import os
-import warnings
+import sys
+import time
+from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import shared_memory
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from multiprocessing import shared_memory
+from typing import List, Optional, Tuple, Union
 
-import astropy
-import cv2
 import numpy as np
 from astropy.io import fits
-from astropy.visualization import ImageNormalize
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from reproject import reproject_interp
@@ -21,28 +21,9 @@ from shapely.geometry import Polygon
 from skimage.transform import AffineTransform, warp
 from tqdm import tqdm
 
+from lib.extract_benchmark import ExtractBenchmark, default_benchmark_path
+from lib.extract_png_worker import PERCENTILE_WHITE_FULL_FOR_MIRROR_SKIP, ProcessingConfig, get_normalized_images, unpack_and_run_worker_from_normalized
 from paths import EXTRACTED_PNG_DIR
-
-STRETCH_FUNCTIONS = {
-    "BaseStretch": astropy.visualization.stretch.BaseStretch,
-    "LinearStretch": astropy.visualization.stretch.LinearStretch,
-    "SqrtStretch": astropy.visualization.stretch.SqrtStretch,
-    "PowerStretch": astropy.visualization.stretch.PowerStretch,
-    "PowerDistStretch": astropy.visualization.stretch.PowerDistStretch,
-    "SquaredStretch": astropy.visualization.stretch.SquaredStretch,
-    "LogStretch": astropy.visualization.stretch.LogStretch,
-    "AsinhStretch": astropy.visualization.stretch.AsinhStretch,
-    "SinhStretch": astropy.visualization.stretch.SinhStretch,
-    "HistEqStretch": astropy.visualization.stretch.HistEqStretch,
-    "ContrastBiasStretch": astropy.visualization.stretch.ContrastBiasStretch,
-}
-
-INTERVAL_FUNCTIONS = {
-    "ManualInterval": astropy.visualization.interval.ManualInterval,
-    "MinMaxInterval": astropy.visualization.interval.MinMaxInterval,
-    "AsymmetricPercentileInterval": astropy.visualization.interval.AsymmetricPercentileInterval,
-    "ZScaleInterval": astropy.visualization.interval.ZScaleInterval,
-}
 
 DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_points": 150}
 
@@ -51,40 +32,6 @@ DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_p
 class NormalizeConfig:
     stretch_function: str = "AsinhStretch"
     interval_function: str = "ZScaleInterval"
-
-
-@dataclass
-class RescaleConfig:
-    percentile_black: float = 0.1
-    percentile_white: float = 0.9
-    background_color: int = 0
-    replace_below_black: int | None = None
-    replace_above_white: int | None = None
-
-
-@dataclass
-class ProcessingConfig:
-    """Holds all parameters for a single image processing variant."""
-
-    percentile_black: float
-    percentile_white: float
-    background_color: int
-    replace_below_black: Optional[int]
-    replace_above_white: Optional[int]
-    stretch_function: str
-    interval_function: str
-
-
-def unpack_and_run_worker(worker_args: Tuple[ProcessingConfig, str, str, tuple, np.dtype]) -> Optional[Exception]:
-    """Helper function to unpack arguments and call the main worker."""
-    config = worker_args[0]
-    output_dir = worker_args[1]
-    shm_name, shape, dtype = worker_args[-3:]
-    existing_shm = shared_memory.SharedMemory(name=shm_name)
-    data_to_process = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
-    result = _worker(config, output_dir, data_to_process)
-    existing_shm.close()
-    return result
 
 
 def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
@@ -97,71 +44,13 @@ def load_fits_data(fits_path: str, index: int = 1) -> np.ndarray:
     return np.ascontiguousarray(data)
 
 
-def get_normalized_images(data, stretch_function: str = "AsinhStretch", interval_function: str = "ZScaleInterval") -> np.ndarray:
-    if stretch_function not in STRETCH_FUNCTIONS:
-        print(f"{interval_function=} is not a valid stretch function. Available stretch functions are: {STRETCH_FUNCTIONS.keys()}. Using default AsinhStretch")
-        stretch_function = "AsinhStretch"
-    if interval_function not in INTERVAL_FUNCTIONS:
-        print(f"{interval_function=} is not a valid interval function. Available interval functions are: {INTERVAL_FUNCTIONS.keys()}. Using default ZScaleInterval")
-        interval_function = "ZScaleInterval"
-    norm = ImageNormalize(data, interval=INTERVAL_FUNCTIONS[interval_function](), stretch=STRETCH_FUNCTIONS[stretch_function]())
-    return norm(data)
-
-
-def rescale_image_to_uint(source_data: np.ndarray, config: RescaleConfig) -> np.ndarray:
-    """Rescales a float image to uint8, with options to replace out-of-band values."""
-    nan_mask = np.isnan(source_data)
-    with warnings.catch_warnings():  # Afaik ignoring the masked values is what we want
-        warnings.filterwarnings("ignore", message=".*'partition' will ignore the 'mask' of the MaskedArray.*")
-        black_level = np.nanpercentile(source_data, config.percentile_black)
-        white_level = np.nanpercentile(source_data, config.percentile_white)
-    if white_level <= black_level:
-        uint8_image = np.full(source_data.shape, config.background_color, dtype=np.uint8)
-        return uint8_image
-    temp_float = np.empty(source_data.shape, dtype=np.float32)
-    # Perform all arithmetic and clipping operations in-place on the temp array.
-    denominator = white_level - black_level
-    if denominator == 0:
-        denominator = 1
-
-    np.subtract(source_data, black_level, out=temp_float)
-    np.divide(temp_float, denominator, out=temp_float)
-    np.multiply(temp_float, 255, out=temp_float)
-    np.clip(temp_float, 0, 255, out=temp_float)
-    np.nan_to_num(temp_float, copy=False, nan=config.background_color)
-    uint8_image = temp_float.astype(np.uint8)
-    del temp_float
-
-    if config.replace_below_black is not None:
-        below_mask = (~nan_mask) & (source_data < black_level)
-        uint8_image[below_mask] = config.replace_below_black
-    if config.replace_above_white is not None:
-        above_mask = source_data > white_level
-        uint8_image[above_mask] = config.replace_above_white
-    uint8_image[nan_mask] = config.background_color
-    return uint8_image
-
-
 def apply_transormation(source_data, transformation_params, output_shape):  # ???
     tform = AffineTransform(matrix=transformation_params)
     transformed_data = warp(source_data, inverse_map=tform.inverse, preserve_range=True, output_shape=output_shape, cval=0)
     return transformed_data
 
 
-def process_data(raw_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
-    """
-    Applies normalization and rescaling to raw FITS data based on a config.
-    """
-    normalized_data = get_normalized_images(raw_data, config.stretch_function, config.interval_function)
-    normalized_data = normalized_data.astype(np.float32)  # prevent upcasting
-    rescale_cfg = RescaleConfig(
-        percentile_black=config.percentile_black, percentile_white=config.percentile_white, background_color=config.background_color, replace_below_black=config.replace_below_black, replace_above_white=config.replace_above_white
-    )
-    rescaled_image = rescale_image_to_uint(normalized_data, rescale_cfg)
-    return rescaled_image
-
-
-def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
+def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Optional[Polygon]:
     """Helper function to get the sky footprint of a FITS file as a Shapely Polygon."""
     try:
         with fits.open(filepath) as hdul:
@@ -174,7 +63,7 @@ def _get_wcs_footprint_polygon(filepath: str, hdu_index=1) -> Polygon | None:
         return None
 
 
-def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> str | None:
+def find_optimal_reference_image(dict_to_process: dict, hdu_index: int = 1) -> Optional[str]:
     """Finds the optimal reference image by first identifying the highest resolution group,
     then finding the image with the best geometric overlap within that group.
 
@@ -310,23 +199,80 @@ def find_best_reference_image(transformations):  # np.ndarray?
     return best_reference
 
 
-def _worker(config: ProcessingConfig, output_dir: str, data_to_process: np.ndarray) -> None | Exception:
-    """
-    A single unit of work. Processes and saves one image based on a ProcessingConfig.
-    """
-    try:
-        filename = f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_{config.stretch_function[:-7]}_{config.interval_function[:-8]}.png"
+def _collect_tasks_from_loaded_param_set(loaded_param_set: dict, output_dir: str, overwrite: bool) -> List[ProcessingConfig]:
+    mirror_options = loaded_param_set.get("mirror_white_overflow", [False])
+    all_params = itertools.product(
+        loaded_param_set["percentile_black"],
+        loaded_param_set["percentile_white"],
+        loaded_param_set["background_color"],
+        loaded_param_set["replace_below_black"],
+        loaded_param_set["replace_above_white"],
+        loaded_param_set["stretch_function"],
+        loaded_param_set["interval_function"],
+        mirror_options,
+    )
+    valid_params = [p for p in all_params if p[1] > p[0]]
+    tasks_to_run: List[ProcessingConfig] = []
+    for params_tuple in valid_params:
+        p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
+        if mirror_bool and p_w == PERCENTILE_WHITE_FULL_FOR_MIRROR_SKIP:
+            continue
+        config = ProcessingConfig(percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool)
+        suffix = "_mir" if mirror_bool else ""
+        filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}{suffix}.png"
         full_outpath = os.path.join(output_dir, filename)
-        if not os.path.exists(full_outpath):
-            processed_data = process_data(data_to_process, config)
-            cv2.imwrite(full_outpath, processed_data)
-        return None  # Indicate success
-    except Exception as e:
-        print(f"Failed on config {config}: {e}")
-        return e
+        if overwrite or not os.path.exists(full_outpath):
+            tasks_to_run.append(config)
+    return tasks_to_run
 
 
-def process_and_save_pngs(data_to_process, processing_params: str | dict, output_dir: str, overwrite: bool = False) -> None:
+def _run_stretch_interval_groups_cpu(
+    tasks_to_run: List[ProcessingConfig],
+    data_to_process: np.ndarray,
+    output_dir: str,
+    bench: Optional[ExtractBenchmark],
+) -> None:
+    by_stretch_interval: dict[Tuple[str, str], List[ProcessingConfig]] = defaultdict(list)
+    for cfg in tasks_to_run:
+        by_stretch_interval[(cfg.stretch_function, cfg.interval_function)].append(cfg)
+    float32_dtype = np.dtype(np.float32)
+    with ProcessPoolExecutor() as executor:
+        with tqdm(total=len(tasks_to_run), desc="   -> Generating PNGs") as pbar:
+            for (stretch_fn, interval_fn), group_configs in by_stretch_interval.items():
+                t_norm = time.perf_counter()
+                normalized_float32 = get_normalized_images(data_to_process, stretch_fn, interval_fn).astype(np.float32)
+                if bench:
+                    bench.record(
+                        "astropy_image_normalize",
+                        time.perf_counter() - t_norm,
+                        f"{stretch_fn}/{interval_fn} variants={len(group_configs)}",
+                    )
+                shm_norm = shared_memory.SharedMemory(create=True, size=normalized_float32.nbytes)
+                shm_norm_arr = np.ndarray(normalized_float32.shape, dtype=np.float32, buffer=shm_norm.buf)
+                shm_norm_arr[:] = normalized_float32[:]
+                group_tasks = [(cfg, output_dir, shm_norm.name, normalized_float32.shape, float32_dtype) for cfg in group_configs]
+                t_pool = time.perf_counter()
+                try:
+                    for _ in executor.map(unpack_and_run_worker_from_normalized, group_tasks):
+                        pbar.update(1)
+                finally:
+                    shm_norm.close()
+                    shm_norm.unlink()
+                if bench:
+                    bench.record(
+                        "process_pool_rescale_png",
+                        time.perf_counter() - t_pool,
+                        f"{stretch_fn}/{interval_fn} variants={len(group_configs)}",
+                    )
+
+
+def process_and_save_pngs(
+    data_to_process,
+    processing_params: Union[str, dict],
+    output_dir: str,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+) -> None:
     """Takes a single FITS data array and generates all specified PNG variants.
 
     Args:
@@ -336,55 +282,36 @@ def process_and_save_pngs(data_to_process, processing_params: str | dict, output
         overwrite (bool): Whether to overwrite existing files.
 
     """
-    shm = shared_memory.SharedMemory(create=True, size=data_to_process.nbytes)
-    shm_np_array = np.ndarray(data_to_process.shape, dtype=data_to_process.dtype, buffer=shm.buf)
-    shm_np_array[:] = data_to_process[:]
-    try:
-        for param_item in processing_params:
-            print(param_item)
-            loaded_param_set = param_item
-            if isinstance(param_item, str) and param_item.endswith(".json"):
-                with open(param_item, "r", encoding="utf-8") as f:
-                    loaded_param_set = json.load(f)
-            if not isinstance(loaded_param_set, dict):
-                print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
-                continue
-            all_params = itertools.product(
-                loaded_param_set["percentile_black"],
-                loaded_param_set["percentile_white"],
-                loaded_param_set["background_color"],
-                loaded_param_set["replace_below_black"],
-                loaded_param_set["replace_above_white"],
-                loaded_param_set["stretch_function"],
-                loaded_param_set["interval_function"],
-            )
-            valid_params = [p for p in all_params if p[1] > p[0]]  # p[1] is p_w, p[0] is p_b
-            # print(valid_params, valid_params)
-            tasks_to_run = []
-            for params_tuple in valid_params:
-                p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn = params_tuple
-                config = ProcessingConfig(percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn)
-                filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}.png"
-                full_outpath = os.path.join(output_dir, filename)
-                if overwrite or not os.path.exists(full_outpath):
-                    tasks_to_run.append((config, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
-            if not tasks_to_run:
-                print("   -> All PNGs already exist. Skipping generation.")
-                continue
-            with ProcessPoolExecutor() as executor:
-                list(tqdm(executor.map(unpack_and_run_worker, tasks_to_run), total=len(tasks_to_run), desc="   -> Generating PNGs"))
-    finally:
-        shm.close()
-        shm.unlink()
+    for param_item in processing_params:
+        print(param_item)
+        loaded_param_set = param_item
+        if isinstance(param_item, str) and param_item.endswith(".json"):
+            with open(param_item, "r", encoding="utf-8") as f:
+                loaded_param_set = json.load(f)
+        if not isinstance(loaded_param_set, dict):
+            print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
+            continue
+        tasks_to_run = _collect_tasks_from_loaded_param_set(loaded_param_set, output_dir, overwrite)
+        if not tasks_to_run:
+            print("   -> All PNGs already exist. Skipping generation.")
+            continue
+        _run_stretch_interval_groups_cpu(tasks_to_run, data_to_process, output_dir, bench)
 
 
-def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def process_dictionary_wcs(
+    dict_to_process: dict,
+    outpath: Optional[str] = None,
+    no_matching: bool = False,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+) -> None:
     """Processes a dictionary of FITS files, aligning them using WCS and generating PNGs."""
     if outpath is None:
         outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)
     if not no_matching:
-        best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
+        with contextlib.nullcontext() if bench is None else bench.span("alignment_setup"):
+            best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
         if best_ref_filepath is None:
             return  # Abort if reference setup failed
     print("\n--- 2. Processing and Aligning Individual Files ---")
@@ -397,6 +324,7 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no
         for index in params["fits_indices"]:
             data_to_process = None
             is_reference = filepath == best_ref_filepath
+            t_io = time.perf_counter()
             if no_matching or is_reference:
                 print(f"  -> Loading HDU {index} directly.")
                 data_to_process = load_fits_data(filepath, index)
@@ -404,8 +332,14 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no
                 print(f"  -> Reprojecting HDU {index} to reference...")
                 with fits.open(filepath) as src_hdul:
                     data_to_process, _ = reproject_interp(src_hdul[index], reference_header, shape_out=reference_shape)
+            if bench:
+                bench.record(
+                    "load_or_reproject",
+                    time.perf_counter() - t_io,
+                    f"{os.path.basename(filepath)} HDU{index}",
+                )
             if data_to_process is not None:
-                process_and_save_pngs(data_to_process, params["processing_params"], image_output_dir, overwrite)
+                process_and_save_pngs(data_to_process, params["processing_params"], image_output_dir, overwrite, bench)
                 del data_to_process
                 gc.collect()
             else:
@@ -413,10 +347,16 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: str | None = None, no
     print("\nProcessing complete.")
 
 
-def main(input_json: str, outdir: str | None = None, no_matching: bool = False, overwrite: bool = False):
+def main(
+    input_json: str,
+    outdir: Optional[str] = None,
+    no_matching: bool = False,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+) -> None:
     with open(input_json, "r", encoding="utf-8") as f:
         dict_to_process = json.load(f)
-    process_dictionary_wcs(dict_to_process, outdir, no_matching, overwrite)
+    process_dictionary_wcs(dict_to_process, outdir, no_matching, overwrite, bench)
 
 
 if __name__ == "__main__":
@@ -425,5 +365,14 @@ if __name__ == "__main__":
     parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--no_matching", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--benchmark", nargs="?", const="", default=None, metavar="FILE", help="Write step timings to FILE (default: outputs/benchmark/extract_cpu_<timestamp>.txt).")
     args = parser.parse_args()
-    main(args.input_json, args.outdir, args.no_matching, args.overwrite)
+    bench: Optional[ExtractBenchmark] = None
+    bench_path: Optional[str] = None
+    if args.benchmark is not None:
+        bench_path = args.benchmark if args.benchmark else default_benchmark_path("cpu")
+        bench = ExtractBenchmark("extract_png_from_fits (CPU)")
+    main(args.input_json, args.outdir, args.no_matching, args.overwrite, bench)
+    if bench is not None and bench_path is not None:
+        bench.write_report(bench_path, input_json=args.input_json, argv=sys.argv)
+        print(f"Benchmark report written to {bench_path}")

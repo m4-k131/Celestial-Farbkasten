@@ -30,10 +30,11 @@ jobs:
         pip install ruff pytest 
         pip install -r requirements.txt
 
-    - name: Run Ruff Linter (Check only)
-      run: |
-        # This just checks for errors, it doesn't fix or commit
-        ruff check . --output-format=github
+    - name: Run Ruff format (check only)
+      run: ruff format --check .
+
+    - name: Run Ruff linter (check only)
+      run: ruff check . --output-format=github
 
     - name: Test with pytest
       run: |

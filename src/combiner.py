@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 from copy import deepcopy
+from typing import Optional, Union
 
 import cv2
 import numpy as np
@@ -96,7 +97,7 @@ def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
     return combined_image, out_config
 
 
-def get_color_image(gray_image: np.ndarray, color: str | tuple, factor: float | int = 1) -> np.ndarray:
+def get_color_image(gray_image: np.ndarray, color: Union[str, tuple], factor: Union[float, int] = 1) -> np.ndarray:
     """Applies a color to a grayscale image, returning a float32 BGR image."""
     normalized_gray = gray_image.astype(np.float32) / 255.0
     if isinstance(color, str):
@@ -111,7 +112,7 @@ def get_color_image(gray_image: np.ndarray, color: str | tuple, factor: float | 
     return colored_image
 
 
-def main(input_json: str, imagename: str | None = None, suffix: str | None = None, outdir: str | None = None, overwrite=False) -> None:
+def main(input_json: str, imagename: Optional[str] = None, suffix: Optional[str] = None, outdir: Optional[str] = None, overwrite=False) -> None:
     with open(input_json, "r", encoding="utf-8") as f:
         config = json.load(f)
     out_image, out_config = combine_config(config, clip_image=True)
@@ -139,4 +140,4 @@ if __name__ == "__main__":
     parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
-    main(args.input_json, args.imagename, args.suffix, args.outdir)
+    main(args.input_json, args.imagename, args.suffix, args.outdir, args.overwrite)

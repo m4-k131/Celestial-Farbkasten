@@ -3,12 +3,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from src.extract_png_from_fits import (
-    process_and_save_pngs,
-    rescale_image_to_uint,
-    RescaleConfig,
-    ProcessingConfig,  # Assuming you created this dataclass as we discussed
-)
+from extract_png_from_fits import ProcessingConfig, process_and_save_pngs
+from lib.extract_png_worker import RescaleConfig, rescale_image_to_uint
 
 VAL_0_PERCENT = 0
 VAL_99_PERCENT = 255
@@ -88,12 +84,14 @@ def test_process_and_save_pngs_task_generation():
     test_outdir = "fake/output/dir"
 
     with (
-        patch("src.extract_png_from_fits.shared_memory.SharedMemory"),
-        patch("src.extract_png_from_fits.np.ndarray"),
-        patch("src.extract_png_from_fits.ProcessPoolExecutor") as mock_executor,
-        patch("src.extract_png_from_fits.os.path.exists") as mock_exists,
+        patch(
+            "extract_png_from_fits.get_normalized_images",
+            return_value=dummy_data.astype(np.float32),
+        ),
+        patch("extract_png_from_fits.ProcessPoolExecutor") as mock_executor,
+        patch("extract_png_from_fits.os.path.exists") as mock_exists,
         patch("builtins.open"),
-        patch("src.extract_png_from_fits.json.load", return_value=mock_params),
+        patch("extract_png_from_fits.json.load", return_value=mock_params),
     ):
         # Let's pretend the first file (b10_w99...) already exists
         # and the second one (b20_w99...) does not.
@@ -103,15 +101,14 @@ def test_process_and_save_pngs_task_generation():
             return False  # File does not exist
 
         mock_exists.side_effect = side_effect
-        # Get the 'map' method from the executor instance
         mock_map = mock_executor.return_value.__enter__.return_value.map
+        mock_map.return_value = iter([None])
         process_and_save_pngs(
             data_to_process=dummy_data,
             processing_params=["dummy.json"],
             output_dir=test_outdir,
             overwrite=False,
         )
-        # 6. --- Assertions ---
         tasks_passed_to_map = list(mock_map.call_args[0][1])
         # We expect only ONE task, for the b20_w99 file,
         # because the b10_w99 file was skipped.

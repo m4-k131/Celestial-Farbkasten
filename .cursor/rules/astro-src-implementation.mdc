@@ -1,0 +1,30 @@
+---
+description: Implementation details for src/ — extraction, combining, colors, JSON config
+globs: src/**/*.py
+alwaysApply: false
+---
+
+# `src/` implementation notes
+
+## Configuration contracts
+
+- **Extract JSON**: top-level `fits_files` maps FITS paths → options (`fits_indices`, `processing_params` paths, etc.). Processing parameter files live under `configs/extract/` (see `generate_extract_json.py` defaults). Stretch/interval names must match **`STRETCH_FUNCTIONS`** / **`INTERVAL_FUNCTIONS`** in `extract_png_from_fits.py`.
+- **Combine JSON**: `operand` (e.g. `"+"`), optional top-level **`clip`**, optional **`colorspace`** (e.g. `"bgr"`), **`images`** list of `{path, color, factor}`; optional **`post_process`** with `saturation` / `contrast`. Nested entries: an image item may embed **`images`** (recursive combine) or **`path`** ending in `.json` to inline another config.
+
+## Colors and OpenCV
+
+- **`lib/colors.COLORS`**: BGR triples for OpenCV; keys like `"$CosmicGold"`. Values may be negative for subtractive tints.
+- **`get_color_image`** in `combiner.py` multiplies normalized grayscale by the color vector and **`factor`**; invalid string keys fall back to black with a console message.
+
+## Extraction stack
+
+- FITS data: `astropy.io.fits`, NaNs zeroed, float32 contiguous arrays for workers.
+- Alignment: WCS + **`reproject.reproject_interp`**; optional control-point matching (**`DEFAULT_MATCHING_PARAMS`**).
+- **CPU extract** (`extract_png_from_fits.py`): parent computes **`get_normalized_images`** once per **`(stretch_function, interval_function)`** group, copies float32 into **`shared_memory`**, workers run **`unpack_and_run_worker_from_normalized`** (rescale + OpenCV PNG). **Experimental GPU** (`extract_png_from_fits_experimental_gpu.py`): same Astropy cache, then TF **`rescale_image_to_uint_tf`** / batched variant + **`write_png_tf`**; **`--batch-size`** batches variants per GPU forward pass.
+- **Benchmark**: optional **`--benchmark [FILE]`** on CPU and GPU extract scripts → **`lib/extract_benchmark.ExtractBenchmark`** writes **`outputs/benchmark/`** (or given path) with per-phase timings.
+- Output PNG filenames encode percentile/black/white/nan handling/stretch/interval (see existing `outputs/extracted_png` examples and tests).
+
+## Quirks to preserve when editing
+
+- **`paths.DOWNLOAD_DIR`** is derived from `PROJECT_ROOT` and `OUTPUT_DIR`; keep path logic consistent if refactoring.
+- **`generate_combine_json.py`**: **`create_combiner_config`** / **`select_png_for_region`** assume **JWST-style** extracted-PNG **folder names** with embedded filter tokens (e.g. **`f115w`**, **`f444w`**) so **`PALETTES`** wavelength keywords match; see the comment in that script.
