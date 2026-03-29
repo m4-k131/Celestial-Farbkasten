@@ -84,8 +84,10 @@ def test_process_and_save_pngs_task_generation():
     test_outdir = "fake/output/dir"
 
     with (
-        patch("extract_png_from_fits.shared_memory.SharedMemory"),
-        patch("extract_png_from_fits.np.ndarray"),
+        patch(
+            "extract_png_from_fits.get_normalized_images",
+            return_value=dummy_data.astype(np.float32),
+        ),
         patch("extract_png_from_fits.ProcessPoolExecutor") as mock_executor,
         patch("extract_png_from_fits.os.path.exists") as mock_exists,
         patch("builtins.open"),
@@ -99,15 +101,14 @@ def test_process_and_save_pngs_task_generation():
             return False  # File does not exist
 
         mock_exists.side_effect = side_effect
-        # Get the 'map' method from the executor instance
         mock_map = mock_executor.return_value.__enter__.return_value.map
+        mock_map.return_value = iter([None])
         process_and_save_pngs(
             data_to_process=dummy_data,
             processing_params=["dummy.json"],
             output_dir=test_outdir,
             overwrite=False,
         )
-        # 6. --- Assertions ---
         tasks_passed_to_map = list(mock_map.call_args[0][1])
         # We expect only ONE task, for the b20_w99 file,
         # because the b10_w99 file was skipped.

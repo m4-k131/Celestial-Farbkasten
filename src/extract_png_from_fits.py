@@ -1,12 +1,16 @@
 import argparse
+import contextlib
 import gc
 import itertools
 import json
 import os
+import sys
+import time
+from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from multiprocessing import shared_memory
-from typing import Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from astropy.io import fits
@@ -17,7 +21,8 @@ from shapely.geometry import Polygon
 from skimage.transform import AffineTransform, warp
 from tqdm import tqdm
 
-from lib.extract_png_worker import ProcessingConfig, unpack_and_run_worker
+from lib.extract_benchmark import ExtractBenchmark, default_benchmark_path
+from lib.extract_png_worker import ProcessingConfig, get_normalized_images, unpack_and_run_worker_from_normalized
 from paths import EXTRACTED_PNG_DIR
 
 DEFAULT_MATCHING_PARAMS = {"detection_sigma": 1.0, "min_area": 4, "max_control_points": 150}
@@ -194,7 +199,13 @@ def find_best_reference_image(transformations):  # np.ndarray?
     return best_reference
 
 
-def process_and_save_pngs(data_to_process, processing_params: Union[str, dict], output_dir: str, overwrite: bool = False) -> None:
+def process_and_save_pngs(
+    data_to_process,
+    processing_params: Union[str, dict],
+    output_dir: str,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+) -> None:
     """Takes a single FITS data array and generates all specified PNG variants.
 
     Args:
@@ -204,62 +215,91 @@ def process_and_save_pngs(data_to_process, processing_params: Union[str, dict], 
         overwrite (bool): Whether to overwrite existing files.
 
     """
-    shm = shared_memory.SharedMemory(create=True, size=data_to_process.nbytes)
-    shm_np_array = np.ndarray(data_to_process.shape, dtype=data_to_process.dtype, buffer=shm.buf)
-    shm_np_array[:] = data_to_process[:]
-    try:
-        for param_item in processing_params:
-            print(param_item)
-            loaded_param_set = param_item
-            if isinstance(param_item, str) and param_item.endswith(".json"):
-                with open(param_item, "r", encoding="utf-8") as f:
-                    loaded_param_set = json.load(f)
-            if not isinstance(loaded_param_set, dict):
-                print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
+    for param_item in processing_params:
+        print(param_item)
+        loaded_param_set = param_item
+        if isinstance(param_item, str) and param_item.endswith(".json"):
+            with open(param_item, "r", encoding="utf-8") as f:
+                loaded_param_set = json.load(f)
+        if not isinstance(loaded_param_set, dict):
+            print(f"Warning: Invalid processing parameter set found. Skipping: {loaded_param_set}")
+            continue
+        mirror_options = loaded_param_set.get("mirror_white_overflow", [False])
+        all_params = itertools.product(
+            loaded_param_set["percentile_black"],
+            loaded_param_set["percentile_white"],
+            loaded_param_set["background_color"],
+            loaded_param_set["replace_below_black"],
+            loaded_param_set["replace_above_white"],
+            loaded_param_set["stretch_function"],
+            loaded_param_set["interval_function"],
+            mirror_options,
+        )
+        valid_params = [p for p in all_params if p[1] > p[0]]  # p[1] is p_w, p[0] is p_b
+        tasks_to_run: List[ProcessingConfig] = []
+        for params_tuple in valid_params:
+            p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
+            if mirror_bool and p_w == 100:
                 continue
-            mirror_options = loaded_param_set.get("mirror_white_overflow", [False])
-            all_params = itertools.product(
-                loaded_param_set["percentile_black"],
-                loaded_param_set["percentile_white"],
-                loaded_param_set["background_color"],
-                loaded_param_set["replace_below_black"],
-                loaded_param_set["replace_above_white"],
-                loaded_param_set["stretch_function"],
-                loaded_param_set["interval_function"],
-                mirror_options,
+            config = ProcessingConfig(
+                percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool
             )
-            valid_params = [p for p in all_params if p[1] > p[0]]  # p[1] is p_w, p[0] is p_b
-            # print(valid_params, valid_params)
-            tasks_to_run = []
-            for params_tuple in valid_params:
-                p_b, p_w, bg, r_bb, r_aw, stretch_fn, interval_fn, mirror_bool = params_tuple
-                if mirror_bool and p_w == 100:
-                    continue
-                config = ProcessingConfig(
-                    percentile_black=p_b, percentile_white=p_w, background_color=bg, replace_below_black=r_bb, replace_above_white=r_aw, stretch_function=stretch_fn, interval_function=interval_fn, mirror_white_overflow=mirror_bool
-                )
-                suffix = "_mir" if mirror_bool else ""
-                filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}{suffix}.png"
-                full_outpath = os.path.join(output_dir, filename)
-                if overwrite or not os.path.exists(full_outpath):
-                    tasks_to_run.append((config, output_dir, shm.name, data_to_process.shape, data_to_process.dtype))
-            if not tasks_to_run:
-                print("   -> All PNGs already exist. Skipping generation.")
-                continue
-            with ProcessPoolExecutor() as executor:
-                list(tqdm(executor.map(unpack_and_run_worker, tasks_to_run), total=len(tasks_to_run), desc="   -> Generating PNGs"))
-    finally:
-        shm.close()
-        shm.unlink()
+            suffix = "_mir" if mirror_bool else ""
+            filename = f"b{p_b}_w{p_w}_nan{bg}_bb{r_bb}_aw{r_aw}_{stretch_fn[:-7]}_{interval_fn[:-8]}{suffix}.png"
+            full_outpath = os.path.join(output_dir, filename)
+            if overwrite or not os.path.exists(full_outpath):
+                tasks_to_run.append(config)
+        if not tasks_to_run:
+            print("   -> All PNGs already exist. Skipping generation.")
+            continue
+        by_stretch_interval: dict[Tuple[str, str], List[ProcessingConfig]] = defaultdict(list)
+        for cfg in tasks_to_run:
+            by_stretch_interval[(cfg.stretch_function, cfg.interval_function)].append(cfg)
+        float32_dtype = np.dtype(np.float32)
+        with ProcessPoolExecutor() as executor:
+            with tqdm(total=len(tasks_to_run), desc="   -> Generating PNGs") as pbar:
+                for (stretch_fn, interval_fn), group_configs in by_stretch_interval.items():
+                    t_norm = time.perf_counter()
+                    normalized_float32 = get_normalized_images(data_to_process, stretch_fn, interval_fn).astype(np.float32)
+                    if bench:
+                        bench.record(
+                            "astropy_image_normalize",
+                            time.perf_counter() - t_norm,
+                            f"{stretch_fn}/{interval_fn} variants={len(group_configs)}",
+                        )
+                    shm_norm = shared_memory.SharedMemory(create=True, size=normalized_float32.nbytes)
+                    shm_norm_arr = np.ndarray(normalized_float32.shape, dtype=np.float32, buffer=shm_norm.buf)
+                    shm_norm_arr[:] = normalized_float32[:]
+                    group_tasks = [(cfg, output_dir, shm_norm.name, normalized_float32.shape, float32_dtype) for cfg in group_configs]
+                    t_pool = time.perf_counter()
+                    try:
+                        for _ in executor.map(unpack_and_run_worker_from_normalized, group_tasks):
+                            pbar.update(1)
+                    finally:
+                        shm_norm.close()
+                        shm_norm.unlink()
+                    if bench:
+                        bench.record(
+                            "process_pool_rescale_png",
+                            time.perf_counter() - t_pool,
+                            f"{stretch_fn}/{interval_fn} variants={len(group_configs)}",
+                        )
 
 
-def process_dictionary_wcs(dict_to_process: dict, outpath: Optional[str] = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def process_dictionary_wcs(
+    dict_to_process: dict,
+    outpath: Optional[str] = None,
+    no_matching: bool = False,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+) -> None:
     """Processes a dictionary of FITS files, aligning them using WCS and generating PNGs."""
     if outpath is None:
         outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)
     if not no_matching:
-        best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
+        with contextlib.nullcontext() if bench is None else bench.span("alignment_setup"):
+            best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
         if best_ref_filepath is None:
             return  # Abort if reference setup failed
     print("\n--- 2. Processing and Aligning Individual Files ---")
@@ -272,6 +312,7 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: Optional[str] = None,
         for index in params["fits_indices"]:
             data_to_process = None
             is_reference = filepath == best_ref_filepath
+            t_io = time.perf_counter()
             if no_matching or is_reference:
                 print(f"  -> Loading HDU {index} directly.")
                 data_to_process = load_fits_data(filepath, index)
@@ -279,8 +320,14 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: Optional[str] = None,
                 print(f"  -> Reprojecting HDU {index} to reference...")
                 with fits.open(filepath) as src_hdul:
                     data_to_process, _ = reproject_interp(src_hdul[index], reference_header, shape_out=reference_shape)
+            if bench:
+                bench.record(
+                    "load_or_reproject",
+                    time.perf_counter() - t_io,
+                    f"{os.path.basename(filepath)} HDU{index}",
+                )
             if data_to_process is not None:
-                process_and_save_pngs(data_to_process, params["processing_params"], image_output_dir, overwrite)
+                process_and_save_pngs(data_to_process, params["processing_params"], image_output_dir, overwrite, bench)
                 del data_to_process
                 gc.collect()
             else:
@@ -288,10 +335,16 @@ def process_dictionary_wcs(dict_to_process: dict, outpath: Optional[str] = None,
     print("\nProcessing complete.")
 
 
-def main(input_json: str, outdir: Optional[str] = None, no_matching: bool = False, overwrite: bool = False):
+def main(
+    input_json: str,
+    outdir: Optional[str] = None,
+    no_matching: bool = False,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+) -> None:
     with open(input_json, "r", encoding="utf-8") as f:
         dict_to_process = json.load(f)
-    process_dictionary_wcs(dict_to_process, outdir, no_matching, overwrite)
+    process_dictionary_wcs(dict_to_process, outdir, no_matching, overwrite, bench)
 
 
 if __name__ == "__main__":
@@ -300,5 +353,14 @@ if __name__ == "__main__":
     parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--no_matching", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--benchmark", nargs="?", const="", default=None, metavar="FILE", help="Write step timings to FILE (default: outputs/benchmark/extract_cpu_<timestamp>.txt).")
     args = parser.parse_args()
-    main(args.input_json, args.outdir, args.no_matching, args.overwrite)
+    bench: Optional[ExtractBenchmark] = None
+    bench_path: Optional[str] = None
+    if args.benchmark is not None:
+        bench_path = args.benchmark if args.benchmark else default_benchmark_path("cpu")
+        bench = ExtractBenchmark("extract_png_from_fits (CPU)")
+    main(args.input_json, args.outdir, args.no_matching, args.overwrite, bench)
+    if bench is not None and bench_path is not None:
+        bench.write_report(bench_path, input_json=args.input_json, argv=sys.argv)
+        print(f"Benchmark report written to {bench_path}")

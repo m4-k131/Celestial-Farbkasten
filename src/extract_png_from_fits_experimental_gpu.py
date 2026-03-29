@@ -3,14 +3,18 @@
 Why GPU usage stays low: Astropy ImageNormalize + ZScale (CPU) dominates wall time; TF only runs cheap
 elementwise rescale + PNG encode. The CPU pipeline uses ProcessPoolExecutor across cores; this path is
 single-process. We cache one normalized float32 image per (stretch_function, interval_function) so
-sweeps over percentiles/mirror do not repeat ImageNormalize.
+sweeps over percentiles/mirror do not repeat ImageNormalize. Variants are processed in batches of
+``--batch-size`` (default 16) so one TF graph sees B stacked images per forward pass.
 """
 
 import argparse
+import contextlib
 import gc
 import itertools
 import json
 import os
+import sys
+import time
 from collections import defaultdict
 from typing import List, Optional, Tuple, Union
 
@@ -20,12 +24,20 @@ from reproject import reproject_interp
 from tqdm import tqdm
 
 from extract_png_from_fits import load_fits_data, setup_alignment_reference
+from lib.extract_benchmark import ExtractBenchmark, default_benchmark_path
 from lib.extract_png_worker import ProcessingConfig, get_normalized_images
-from lib.extract_png_worker_experimental_gpu import run_single_png_task_gpu
+from lib.extract_png_worker_experimental_gpu import gpu_png_output_path, run_png_variant_batch_gpu, run_single_png_task_gpu
 from paths import EXTRACTED_PNG_DIR
 
 
-def process_and_save_pngs_experimental_gpu(data_to_process: np.ndarray, processing_params: Union[str, dict], output_dir: str, overwrite: bool = False) -> None:
+def process_and_save_pngs_experimental_gpu(
+    data_to_process: np.ndarray,
+    processing_params: Union[str, dict],
+    output_dir: str,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+    batch_size: int = 16,
+) -> None:
     for param_item in processing_params:
         print(param_item)
         loaded_param_set = param_item
@@ -73,21 +85,52 @@ def process_and_save_pngs_experimental_gpu(data_to_process: np.ndarray, processi
         by_stretch_interval: dict[Tuple[str, str], List[ProcessingConfig]] = defaultdict(list)
         for cfg in tasks_to_run:
             by_stretch_interval[(cfg.stretch_function, cfg.interval_function)].append(cfg)
-        tasks_with_norm: list[tuple[ProcessingConfig, np.ndarray]] = []
+        bs = max(1, batch_size)
+        t_var = time.perf_counter()
         for (stretch_fn, interval_fn), group_cfgs in by_stretch_interval.items():
+            t_norm = time.perf_counter()
             normalized_float32 = get_normalized_images(data_to_process, stretch_fn, interval_fn).astype(np.float32)
-            for cfg in group_cfgs:
-                tasks_with_norm.append((cfg, normalized_float32))
-        for config, normalized_float32 in tqdm(tasks_with_norm, desc="   -> Generating PNGs (TF experimental GPU)"):
-            run_single_png_task_gpu(config, output_dir, data_to_process, normalized_float32=normalized_float32)
+            if bench:
+                bench.record(
+                    "astropy_image_normalize",
+                    time.perf_counter() - t_norm,
+                    f"{stretch_fn}/{interval_fn} variants={len(group_cfgs)}",
+                )
+            n = len(group_cfgs)
+            with tqdm(total=n, desc="   -> Generating PNGs (TF experimental GPU)") as pbar:
+                for start in range(0, n, bs):
+                    batch = group_cfgs[start : start + bs]
+                    pending = [c for c in batch if overwrite or not os.path.exists(gpu_png_output_path(c, output_dir))]
+                    if not pending:
+                        pbar.update(len(batch))
+                        continue
+                    if len(pending) == 1:
+                        run_single_png_task_gpu(pending[0], output_dir, data_to_process, normalized_float32=normalized_float32, overwrite=overwrite)
+                    else:
+                        run_png_variant_batch_gpu(pending, normalized_float32, output_dir)
+                    pbar.update(len(batch))
+        if bench:
+            bench.record(
+                "tf_rescale_encode_write_png",
+                time.perf_counter() - t_var,
+                f"variants={len(tasks_to_run)} batch_size={bs}",
+            )
 
 
-def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: Optional[str] = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def process_dictionary_wcs_experimental_gpu(
+    dict_to_process: dict,
+    outpath: Optional[str] = None,
+    no_matching: bool = False,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+    batch_size: int = 16,
+) -> None:
     if outpath is None:
         outpath = EXTRACTED_PNG_DIR
     best_ref_filepath, reference_header, reference_shape = (None, None, None)
     if not no_matching:
-        best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
+        with contextlib.nullcontext() if bench is None else bench.span("alignment_setup"):
+            best_ref_filepath, reference_header, reference_shape = setup_alignment_reference(dict_to_process)
         if best_ref_filepath is None:
             return
     print("\n--- 2. Processing and Aligning Individual Files (experimental TF GPU) ---")
@@ -100,6 +143,7 @@ def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: Opti
         for index in params["fits_indices"]:
             data_to_process = None
             is_reference = filepath == best_ref_filepath
+            t_io = time.perf_counter()
             if no_matching or is_reference:
                 print(f"  -> Loading HDU {index} directly.")
                 data_to_process = load_fits_data(filepath, index)
@@ -107,8 +151,14 @@ def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: Opti
                 print(f"  -> Reprojecting HDU {index} to reference...")
                 with fits.open(filepath) as src_hdul:
                     data_to_process, _ = reproject_interp(src_hdul[index], reference_header, shape_out=reference_shape)
+            if bench:
+                bench.record(
+                    "load_or_reproject",
+                    time.perf_counter() - t_io,
+                    f"{os.path.basename(filepath)} HDU{index}",
+                )
             if data_to_process is not None:
-                process_and_save_pngs_experimental_gpu(data_to_process, params["processing_params"], image_output_dir, overwrite)
+                process_and_save_pngs_experimental_gpu(data_to_process, params["processing_params"], image_output_dir, overwrite, bench, batch_size)
                 del data_to_process
                 gc.collect()
             else:
@@ -116,10 +166,17 @@ def process_dictionary_wcs_experimental_gpu(dict_to_process: dict, outpath: Opti
     print("\nProcessing complete.")
 
 
-def main(input_json: str, outdir: Optional[str] = None, no_matching: bool = False, overwrite: bool = False) -> None:
+def main(
+    input_json: str,
+    outdir: Optional[str] = None,
+    no_matching: bool = False,
+    overwrite: bool = False,
+    bench: Optional[ExtractBenchmark] = None,
+    batch_size: int = 16,
+) -> None:
     with open(input_json, encoding="utf-8") as f:
         dict_to_process = json.load(f)
-    process_dictionary_wcs_experimental_gpu(dict_to_process, outdir, no_matching, overwrite)
+    process_dictionary_wcs_experimental_gpu(dict_to_process, outdir, no_matching, overwrite, bench, batch_size)
 
 
 if __name__ == "__main__":
@@ -128,5 +185,15 @@ if __name__ == "__main__":
     parser.add_argument("--outdir", required=False, type=str)
     parser.add_argument("--no_matching", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--batch-size", type=int, default=16, metavar="N", help="TF rescale variants per batched GPU call (default: 16).")
+    parser.add_argument("--benchmark", nargs="?", const="", default=None, metavar="FILE", help="Write step timings to FILE (default: outputs/benchmark/extract_gpu_<timestamp>.txt).")
     args = parser.parse_args()
-    main(args.input_json, args.outdir, args.no_matching, args.overwrite)
+    bench: Optional[ExtractBenchmark] = None
+    bench_path: Optional[str] = None
+    if args.benchmark is not None:
+        bench_path = args.benchmark if args.benchmark else default_benchmark_path("gpu")
+        bench = ExtractBenchmark("extract_png_from_fits_experimental_gpu (TF GPU)")
+    main(args.input_json, args.outdir, args.no_matching, args.overwrite, bench, args.batch_size)
+    if bench is not None and bench_path is not None:
+        bench.write_report(bench_path, input_json=args.input_json, argv=sys.argv)
+        print(f"Benchmark report written to {bench_path}")

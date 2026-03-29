@@ -115,3 +115,11 @@ There is no separate schema document yet. Use the checked-in files under **`conf
 
 - `src/utils/generate_extract_json.py` — scaffold extract (and simple combine) JSON from folders.
 - `src/utils/generate_combine_json.py` — build combine configs from **`src/lib/colors.PALETTES`** and extracted PNG folder names.
+
+---
+
+## Experimental GPU extract
+
+`src/extract_png_from_fits_experimental_gpu.py` (TensorFlow rescale/encode, optional extra deps) is **experimental**. In practice it is often **slower end-to-end than** `extract_png_from_fits.py` **on the CPU**, because Astropy normalization stays on the CPU, work is largely sequential, and PNG I/O and TF overhead dominate—actual behavior **depends on your hardware** (CPU core count, GPU, drivers, disk). Use the CPU extractor when you care about wall time unless you are profiling or extending the GPU path.
+
+It has been exercised on **Python 3.9** with **TensorFlow** and an **NVIDIA GeForce RTX 4070 Ti**; other Python versions, TF builds, or GPUs may behave differently.

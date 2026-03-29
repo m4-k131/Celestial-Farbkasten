@@ -3,7 +3,7 @@
 import os
 import traceback
 import warnings
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 
@@ -72,6 +72,76 @@ def rescale_image_to_uint_tf(source_data: np.ndarray, config: RescaleConfig) -> 
     return _rescale_image_to_uint_tf_on_device(source_data, config, _gpu_device_name())
 
 
+def rescale_image_to_uint_tf_batched(source_data: np.ndarray, rescale_cfgs: List[RescaleConfig]) -> List[np.ndarray]:
+    """Batched TF rescale: one H2D tile of `source_data`, shared nan mask; CPU nanpercentile per row."""
+    n = len(rescale_cfgs)
+    out: List[Optional[np.ndarray]] = [None] * n
+    nan_mask_np = np.isnan(source_data)
+    active_idx: List[int] = []
+    active_cfgs: List[RescaleConfig] = []
+    active_bl: List[float] = []
+    active_wl: List[float] = []
+    for i, cfg in enumerate(rescale_cfgs):
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*'partition' will ignore the 'mask' of the MaskedArray.*")
+            bl = float(np.nanpercentile(source_data, cfg.percentile_black))
+            wl = float(np.nanpercentile(source_data, cfg.percentile_white))
+        if wl <= bl:
+            out[i] = np.full(source_data.shape, cfg.background_color, dtype=np.uint8)
+        else:
+            active_idx.append(i)
+            active_cfgs.append(cfg)
+            active_bl.append(bl)
+            active_wl.append(wl)
+    if not active_cfgs:
+        return out  # type: ignore[return-value]
+    B = len(active_cfgs)
+    device = _gpu_device_name()
+    bls = np.asarray(active_bl, dtype=np.float32).reshape(B, 1, 1)
+    wls = np.asarray(active_wl, dtype=np.float32).reshape(B, 1, 1)
+    mir = np.asarray([[float(getattr(c, "mirror_white_overflow", False))] for c in active_cfgs], dtype=np.float32).reshape(B, 1, 1)
+    has_rb = np.asarray([[1.0 if c.replace_below_black is not None else 0.0] for c in active_cfgs], dtype=np.float32).reshape(B, 1, 1)
+    rb_vals = np.asarray([[float(c.replace_below_black) if c.replace_below_black is not None else 0.0] for c in active_cfgs], dtype=np.float32).reshape(B, 1, 1)
+    has_ra = np.asarray(
+        [[1.0 if (c.replace_above_white is not None and not getattr(c, "mirror_white_overflow", False)) else 0.0] for c in active_cfgs],
+        dtype=np.float32,
+    ).reshape(B, 1, 1)
+    ra_vals = np.asarray([[float(c.replace_above_white) if c.replace_above_white is not None else 0.0] for c in active_cfgs], dtype=np.float32).reshape(B, 1, 1)
+    bg_f = np.asarray([[float(c.background_color)] for c in active_cfgs], dtype=np.float32).reshape(B, 1, 1)
+    with tf.device(device):
+        x = tf.constant(source_data, dtype=tf.float32)
+        x_b = tf.tile(tf.expand_dims(x, 0), [B, 1, 1])
+        black = tf.constant(bls, dtype=tf.float32)
+        white = tf.constant(wls, dtype=tf.float32)
+        denom = white - black
+        denom = tf.where(tf.equal(denom, 0.0), 1.0, denom)
+        base = (x_b - black) / denom
+        mir_t = tf.constant(mir, dtype=tf.float32)
+        over = base > 1.0
+        temp_mir = tf.where(over, 2.0 - base, base)
+        temp_mir = tf.maximum(temp_mir, 0.0)
+        temp = tf.where(mir_t > 0.5, temp_mir, base)
+        temp = temp * 255.0
+        temp = tf.clip_by_value(temp, 0.0, 255.0)
+        bg_t = tf.constant(bg_f, dtype=tf.float32)
+        temp = tf.where(tf.math.is_nan(temp), bg_t, temp)
+        nan_mask_b = tf.tile(tf.expand_dims(tf.constant(nan_mask_np, dtype=tf.bool), 0), [B, 1, 1])
+        has_rb_t = tf.constant(has_rb, dtype=tf.float32)
+        rb_t = tf.constant(rb_vals, dtype=tf.float32)
+        below = tf.logical_and(tf.logical_not(nan_mask_b), x_b < black)
+        temp = tf.where(tf.logical_and(below, has_rb_t > 0.5), rb_t, temp)
+        has_ra_t = tf.constant(has_ra, dtype=tf.float32)
+        ra_t = tf.constant(ra_vals, dtype=tf.float32)
+        above = x_b > white
+        temp = tf.where(tf.logical_and(above, has_ra_t > 0.5), ra_t, temp)
+        temp = tf.where(nan_mask_b, bg_t, temp)
+        temp = tf.clip_by_value(temp, 0.0, 255.0)
+        stacked = tf.cast(temp, tf.uint8).numpy()
+    for k, slot in enumerate(active_idx):
+        out[slot] = stacked[k]
+    return out  # type: ignore[return-value]
+
+
 def rescale_only_experimental_gpu(normalized_data: np.ndarray, config: ProcessingConfig) -> np.ndarray:
     """TF rescale + encode path when `get_normalized_images` was already run for this (stretch, interval)."""
     rescale_cfg = RescaleConfig(
@@ -99,17 +169,43 @@ def write_png_tf(path: str, gray_uint8: np.ndarray) -> None:
     tf.io.write_file(path, encoded)
 
 
+def gpu_png_output_path(config: ProcessingConfig, output_dir: str) -> str:
+    mir_suffix = "_mir" if config.mirror_white_overflow else ""
+    filename = (
+        f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_"
+        f"{config.stretch_function[:-7]}_{config.interval_function[:-8]}{mir_suffix}.png"
+    )
+    return os.path.join(output_dir, filename)
+
+
+def run_png_variant_batch_gpu(configs: List[ProcessingConfig], normalized_float32: np.ndarray, output_dir: str) -> None:
+    """Writes one PNG per config; batched TF rescale then sequential encode+write."""
+    rescale_cfgs = [
+        RescaleConfig(
+            percentile_black=c.percentile_black,
+            percentile_white=c.percentile_white,
+            background_color=c.background_color,
+            replace_below_black=c.replace_below_black,
+            replace_above_white=c.replace_above_white,
+            mirror_white_overflow=c.mirror_white_overflow,
+        )
+        for c in configs
+    ]
+    images = rescale_image_to_uint_tf_batched(normalized_float32, rescale_cfgs)
+    for cfg, img in zip(configs, images):
+        write_png_tf(gpu_png_output_path(cfg, output_dir), img)
+
+
 def run_single_png_task_gpu(
     config: ProcessingConfig,
     output_dir: str,
     data_to_process: np.ndarray,
     normalized_float32: Optional[np.ndarray] = None,
+    overwrite: bool = False,
 ) -> Optional[Exception]:
     try:
-        mir_suffix = "_mir" if config.mirror_white_overflow else ""
-        filename = f"b{config.percentile_black}_w{config.percentile_white}_nan{config.background_color}_bb{config.replace_below_black}_aw{config.replace_above_white}_{config.stretch_function[:-7]}_{config.interval_function[:-8]}{mir_suffix}.png"
-        full_outpath = os.path.join(output_dir, filename)
-        if not os.path.exists(full_outpath):
+        full_outpath = gpu_png_output_path(config, output_dir)
+        if overwrite or not os.path.exists(full_outpath):
             if normalized_float32 is None:
                 processed_data = process_data_experimental_gpu(data_to_process, config)
             else:
