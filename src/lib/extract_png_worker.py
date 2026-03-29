@@ -32,6 +32,9 @@ INTERVAL_FUNCTIONS = {
     "ZScaleInterval": astropy.visualization.interval.ZScaleInterval,
 }
 
+# Mirror mode has no effect when white percentile is at full scale (100).
+PERCENTILE_WHITE_FULL_FOR_MIRROR_SKIP = 100
+
 
 @dataclass
 class RescaleConfig:

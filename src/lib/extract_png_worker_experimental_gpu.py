@@ -3,7 +3,7 @@
 import os
 import traceback
 import warnings
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -15,6 +15,9 @@ except ImportError as e:
 from lib.extract_png_worker import ProcessingConfig, RescaleConfig, get_normalized_images
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+# TF graph uses 0.5 as "bool flag on" for float masks (mir, has_rb, has_ra).
+TF_BOOL_MASK_ON = 0.5
+
 for _gpu in tf.config.list_physical_devices("GPU"):
     try:
         tf.config.experimental.set_memory_growth(_gpu, True)
@@ -69,8 +72,10 @@ def rescale_image_to_uint_tf(source_data: np.ndarray, config: RescaleConfig) -> 
     return _rescale_image_to_uint_tf_on_device(source_data, config, _gpu_device_name())
 
 
-def rescale_image_to_uint_tf_batched(source_data: np.ndarray, rescale_cfgs: List[RescaleConfig]) -> List[np.ndarray]:
-    """Batched TF rescale: one H2D tile of `source_data`, shared nan mask; CPU nanpercentile per row."""
+def _prefilter_active_rescale_cfgs(
+    source_data: np.ndarray,
+    rescale_cfgs: List[RescaleConfig],
+) -> Tuple[List[Optional[np.ndarray]], np.ndarray, List[int], List[RescaleConfig], List[float], List[float]]:
     n = len(rescale_cfgs)
     out: List[Optional[np.ndarray]] = [None] * n
     nan_mask_np = np.isnan(source_data)
@@ -90,8 +95,16 @@ def rescale_image_to_uint_tf_batched(source_data: np.ndarray, rescale_cfgs: List
             active_cfgs.append(cfg)
             active_bl.append(bl)
             active_wl.append(wl)
-    if not active_cfgs:
-        return out  # type: ignore[return-value]
+    return out, nan_mask_np, active_idx, active_cfgs, active_bl, active_wl
+
+
+def _tf_batched_rescale_stack(
+    source_data: np.ndarray,
+    nan_mask_np: np.ndarray,
+    active_cfgs: List[RescaleConfig],
+    active_bl: List[float],
+    active_wl: List[float],
+) -> np.ndarray:
     B = len(active_cfgs)
     device = _gpu_device_name()
     bls = np.asarray(active_bl, dtype=np.float32).reshape(B, 1, 1)
@@ -117,7 +130,7 @@ def rescale_image_to_uint_tf_batched(source_data: np.ndarray, rescale_cfgs: List
         over = base > 1.0
         temp_mir = tf.where(over, 2.0 - base, base)
         temp_mir = tf.maximum(temp_mir, 0.0)
-        temp = tf.where(mir_t > 0.5, temp_mir, base)
+        temp = tf.where(mir_t > TF_BOOL_MASK_ON, temp_mir, base)
         temp = temp * 255.0
         temp = tf.clip_by_value(temp, 0.0, 255.0)
         bg_t = tf.constant(bg_f, dtype=tf.float32)
@@ -126,14 +139,22 @@ def rescale_image_to_uint_tf_batched(source_data: np.ndarray, rescale_cfgs: List
         has_rb_t = tf.constant(has_rb, dtype=tf.float32)
         rb_t = tf.constant(rb_vals, dtype=tf.float32)
         below = tf.logical_and(tf.logical_not(nan_mask_b), x_b < black)
-        temp = tf.where(tf.logical_and(below, has_rb_t > 0.5), rb_t, temp)
+        temp = tf.where(tf.logical_and(below, has_rb_t > TF_BOOL_MASK_ON), rb_t, temp)
         has_ra_t = tf.constant(has_ra, dtype=tf.float32)
         ra_t = tf.constant(ra_vals, dtype=tf.float32)
         above = x_b > white
-        temp = tf.where(tf.logical_and(above, has_ra_t > 0.5), ra_t, temp)
+        temp = tf.where(tf.logical_and(above, has_ra_t > TF_BOOL_MASK_ON), ra_t, temp)
         temp = tf.where(nan_mask_b, bg_t, temp)
         temp = tf.clip_by_value(temp, 0.0, 255.0)
-        stacked = tf.cast(temp, tf.uint8).numpy()
+        return tf.cast(temp, tf.uint8).numpy()
+
+
+def rescale_image_to_uint_tf_batched(source_data: np.ndarray, rescale_cfgs: List[RescaleConfig]) -> List[np.ndarray]:
+    """Batched TF rescale: one H2D tile of `source_data`, shared nan mask; CPU nanpercentile per row."""
+    out, nan_mask_np, active_idx, active_cfgs, active_bl, active_wl = _prefilter_active_rescale_cfgs(source_data, rescale_cfgs)
+    if not active_cfgs:
+        return out  # type: ignore[return-value]
+    stacked = _tf_batched_rescale_stack(source_data, nan_mask_np, active_cfgs, active_bl, active_wl)
     for k, slot in enumerate(active_idx):
         out[slot] = stacked[k]
     return out  # type: ignore[return-value]
@@ -186,7 +207,7 @@ def run_png_variant_batch_gpu(configs: List[ProcessingConfig], normalized_float3
         for c in configs
     ]
     images = rescale_image_to_uint_tf_batched(normalized_float32, rescale_cfgs)
-    for cfg, img in zip(configs, images):
+    for cfg, img in zip(configs, images, strict=True):
         write_png_tf(gpu_png_output_path(cfg, output_dir), img)
 
 
