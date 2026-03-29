@@ -11,7 +11,7 @@ from paths import CSV_DIR
 # pylint:disable=no-member
 
 
-def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, project: str = "JWST", outdir: Optional[str] = None) -> None:
+def main(target_name: str, exact_name: bool = False, calib_level: int = 3, project: str = "JWST", outdir: Optional[str] = None) -> None:
     load_dotenv()
     api_token = os.getenv("MAST_API_TOKEN")
     if api_token is None:
@@ -33,7 +33,7 @@ def main(target_name: str, exact_name: bool = False, calib_levle: int = 3, proje
     # print(sessioninfo)
     if not exact_name:
         target_name = f"*{target_name}*"
-    obs_list = Observations.query_criteria(target_name=target_name, dataproduct_type="image", calib_level=calib_levle, project=project)
+    obs_list = Observations.query_criteria(target_name=target_name, dataproduct_type="image", calib_level=calib_level, project=project)
     target_name = target_name.strip("*")
     df = obs_list.to_pandas()
     if outdir is None:

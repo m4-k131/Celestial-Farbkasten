@@ -20,10 +20,11 @@ alwaysApply: false
 
 - FITS data: `astropy.io.fits`, NaNs zeroed, float32 contiguous arrays for workers.
 - Alignment: WCS + **`reproject.reproject_interp`**; optional control-point matching (**`DEFAULT_MATCHING_PARAMS`**).
+- **CPU extract** (`extract_png_from_fits.py`): parent computes **`get_normalized_images`** once per **`(stretch_function, interval_function)`** group, copies float32 into **`shared_memory`**, workers run **`unpack_and_run_worker_from_normalized`** (rescale + OpenCV PNG). **Experimental GPU** (`extract_png_from_fits_experimental_gpu.py`): same Astropy cache, then TF **`rescale_image_to_uint_tf`** / batched variant + **`write_png_tf`**; **`--batch-size`** batches variants per GPU forward pass.
+- **Benchmark**: optional **`--benchmark [FILE]`** on CPU and GPU extract scripts → **`lib/extract_benchmark.ExtractBenchmark`** writes **`outputs/benchmark/`** (or given path) with per-phase timings.
 - Output PNG filenames encode percentile/black/white/nan handling/stretch/interval (see existing `outputs/extracted_png` examples and tests).
 
 ## Quirks to preserve when editing
 
-- **`query_observation_lists.main`** parameter is spelled `calib_levle` (typo in API — fix only if touching call sites and tests).
 - **`paths.DOWNLOAD_DIR`** is derived from `PROJECT_ROOT` and `OUTPUT_DIR`; keep path logic consistent if refactoring.
-- Downstream tooling (e.g. `generate_combine_json.select_png_for_region`) assumes **JWST-style folder names** containing filter tokens such as `f115w`, `f444w`.
+- **`generate_combine_json.py`**: **`create_combiner_config`** / **`select_png_for_region`** assume **JWST-style** extracted-PNG **folder names** with embedded filter tokens (e.g. **`f115w`**, **`f444w`**) so **`PALETTES`** wavelength keywords match; see the comment in that script.

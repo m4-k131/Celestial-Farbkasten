@@ -5,6 +5,10 @@ from typing import Optional
 
 from lib.colors import PALETTES
 
+# create_combiner_config matches PALETTES wavelength keywords against each subfolder name under target_dir.
+# Folder names are expected to follow JWST-style conventions with embedded filter tokens (e.g. f115w, f444w)
+# so the keyword appears in folder_path.name; see select_png_for_region for PNG filename templates.
+
 
 def get_wavelength_from_folder(folder_name: str) -> Optional[str]:
     """Extracts the wavelength string from a folder name."""
