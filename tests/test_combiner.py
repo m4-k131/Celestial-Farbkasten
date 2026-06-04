@@ -1,8 +1,10 @@
-import os
 import json
+import os
+import shutil
+
 import cv2
 import numpy as np
-import shutil
+from src.combiner import alpha_composite, combine_config
 from src.combiner import main as combiner_main
 
 
@@ -66,3 +68,47 @@ def test_combiner_integration(tmp_path):
         # Deletes the entire temporary tree created during this test
         if os.path.exists(tmp_path):
             shutil.rmtree(tmp_path)
+
+
+def test_alpha_composite_full_alpha():
+    dst = np.array([[[100.0, 50.0, 0.0]]], dtype=np.float32)
+    src = np.array([[[200.0, 200.0, 200.0]]], dtype=np.float32)
+    result = alpha_composite(dst, src, alpha=1.0)
+    np.testing.assert_allclose(result, src)
+
+
+def test_alpha_composite_zero_alpha():
+    dst = np.array([[[100.0, 50.0, 0.0]]], dtype=np.float32)
+    src = np.array([[[200.0, 200.0, 200.0]]], dtype=np.float32)
+    result = alpha_composite(dst, src, alpha=0.0)
+    np.testing.assert_allclose(result, dst)
+
+
+def test_alpha_composite_half_alpha():
+    dst = np.array([[[0.0, 0.0, 0.0]]], dtype=np.float32)
+    src = np.array([[[100.0, 100.0, 100.0]]], dtype=np.float32)
+    result = alpha_composite(dst, src, alpha=0.5)
+    np.testing.assert_allclose(result, np.array([[[50.0, 50.0, 50.0]]], dtype=np.float32))
+
+
+def test_alpha_composite_negative_color():
+    dst = np.array([[[100.0, 100.0, 100.0]]], dtype=np.float32)
+    src = np.array([[[-150.0, -150.0, 255.0]]], dtype=np.float32)
+    result = alpha_composite(dst, src, alpha=0.5)
+    np.testing.assert_allclose(result, np.array([[[-25.0, -25.0, 177.5]]], dtype=np.float32))
+
+
+def test_combine_config_alpha_key(tmp_path):
+    path_white = str(tmp_path / "white.png")
+    img_white = np.ones((10, 10), dtype=np.uint8) * 255
+    cv2.imwrite(path_white, img_white)
+
+    config = {
+        "images": [
+            {"path": path_white, "color": [0, 0, 255], "factor": 1.0},
+            {"path": path_white, "color": [255, 0, 0], "factor": 1.0, "alpha": 1.0},
+        ]
+    }
+    result, _ = combine_config(config)
+    # alpha=1.0 on the second layer means it fully replaces the first: expect pure (255,0,0)
+    np.testing.assert_allclose(np.mean(result, axis=(0, 1)), [255.0, 0.0, 0.0], atol=1)

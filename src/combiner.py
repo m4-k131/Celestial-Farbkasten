@@ -39,12 +39,47 @@ def adjust_saturation_contrast(image: np.ndarray, saturation_scale: float = 1.5,
     return adjusted_image
 
 
+def alpha_composite(dst: np.ndarray, src: np.ndarray, alpha: float) -> np.ndarray:
+    """Porter-Duff 'over' compositing of src onto dst in unclamped float32 space.
+
+    Args:
+        dst: The running composite (float32 BGR, may contain negative values).
+        src: The new layer to composite on top (float32 BGR, may contain negative values).
+        alpha: Blend weight for src in [0, 1]. 1 fully replaces dst with src;
+               0 leaves dst unchanged. Values outside [0, 1] are clamped.
+
+    Returns:
+        Composited float32 BGR image: src * alpha + dst * (1 - alpha).
+
+    """
+    alpha = float(np.clip(alpha, 0.0, 1.0))
+    return src * alpha + dst * (1.0 - alpha)
+
+
 def get_color_image_from_config(image_config: dict) -> np.ndarray:
     """Reads image path, color, and factor from a base config dict."""
     gray_image = cv2.imread(image_config["path"], cv2.IMREAD_GRAYSCALE)
     if gray_image is None:
         raise FileNotFoundError(f"Could not load image at path: {image_config['path']}")
     return get_color_image(gray_image, image_config["color"], image_config.get("factor", 1))
+
+
+def _composite_layers(float_images: list) -> np.ndarray:
+    """Composites a list of (image, alpha) tuples into a single float32 image.
+
+    Layers with alpha=None are added additively (current default behaviour).
+    Layers with an alpha value use Porter-Duff 'over' compositing onto the running result.
+
+    """
+    combined = None
+    for img, alpha in float_images:
+        if combined is None:
+            combined = img if alpha is None else alpha_composite(np.zeros_like(img), img, alpha)
+        elif alpha is None:
+            combined = combined + img
+        else:
+            combined = alpha_composite(combined, img, alpha)
+    return combined
 
 
 def combine_from_json(json_path: str) -> np.ndarray:
@@ -84,10 +119,9 @@ def combine_config(config: dict, clip_image: bool = False) -> np.ndarray:
                 out_config_sub["clip"] = image_config["clip"]
             out_config["images"][i] = out_config_sub
 
-        images.append(loaded_image)
-    float_images = [img.astype(np.float32) for img in images]
-    images_array = np.array(float_images)
-    combined_image = images_array.sum(axis=0)
+        images.append((loaded_image, image_config.get("alpha")))
+    float_images = [(img.astype(np.float32), a) for img, a in images]
+    combined_image = _composite_layers(float_images)
     if clip_image:
         combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
     post_process = config.get("post_process")
